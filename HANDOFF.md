@@ -1,11 +1,12 @@
 # Handoff
 
-_Last updated: 2026-11-04 (second session)_
+_Last updated: 2026-11-04 (hosting session)_
 
 ## Status
-- The data relay is deployed and working: Supabase project "Menage", Edge Function `implied-open`, version 3. It covers four indexes, including the Nasdaq Composite (it uses NQ futures as a stand-in).
+- The data relay is deployed and working: Supabase project "Menage", Edge Function `implied-open`, version 4 (adds the Canada data). It covers four US indexes plus the TSX, including the Nasdaq Composite (it uses NQ futures as a stand-in).
 - The page (`site/`) is built and tested in a headless browser: desktop, tablet and phone widths, light and dark, live data, simulated market-open and weekend times.
-- Site merged into main (PR #2, approved by Matt). Not yet hosted. Plan: Cloudflare Pages connected to this repo, served at **implied-open.soesraider.com** (Matt's choice). Domain DNS is already on Cloudflare.
+- Site merged into main (PR #2), Canada section merged (PR #4).
+- **Live at https://implied-open.soesraider.com** (hosted 2026-11-04). See "Hosting and deploys" below.
 - The old private Claude artifact version was deleted at Matt's request.
 
 ## Known limits
@@ -14,13 +15,19 @@ _Last updated: 2026-11-04 (second session)_
 - Market holidays aren't handled.
 - The Composite estimate is a proxy.
 
+## Hosting and deploys
+- **Cloudflare Pages project `implied-open`** on Matt's Cloudflare account, connected to GitHub repo `menageyyc/implied-open`. Production branch `main`, no build command, output folder `site`.
+- **Deploys are automatic.** Every merge to main republishes the site in about a minute. Nothing to run by hand.
+- **Previews:** every other branch (e.g. a `claude/*` branch with an open PR) gets its own preview link, `https://<branch>.implied-open.pages.dev`, and Cloudflare posts it on the PR. Use that link to show Matt website changes before merging.
+- **Custom domain:** `implied-open.soesraider.com`, added to the Pages project, plus one DNS record in the soesraider.com zone: `CNAME implied-open → implied-open.pages.dev`, proxied. No other records in that zone were changed (the rest are Matt's existing GoDaddy/cPanel mail records).
+- Also reachable at `https://implied-open.pages.dev` (same site).
+- **Non-crawlable, checked live 2026-11-04:** the response carries `X-Robots-Tag: noindex, nofollow, noarchive` (from `site/_headers`), `/robots.txt` disallows everything, and the page has the noindex meta tag.
+- **Checked live 2026-11-04:** loads over HTTPS, calls the Supabase function `implied-open` (HTTP 200), live prices and the Canada section render, no page errors.
+- The hosting was set up through the Cloudflare API connector; Cloudflare's GitHub app was already installed on Matt's GitHub account, so no browser step was needed.
+- To manage it by hand: Cloudflare dashboard → Workers & Pages → `implied-open`.
+
 ## Pending
-- **PR #4 (Canada section)** on branch `claude/canada` is waiting for Matt's approval. It adds a TSX estimate from S&P 500 futures, plus oil, gas, gold, CAD and the Canada 10-year yield as drivers. Function v4 is already deployed and backward-compatible with main.
-- **Hosting not set up yet.** Matt connected the "Cloudflare Developer Platform" connector on 2026-11-04. It only offers Workers read, KV, R2, D1, Hyperdrive and docs search: no Pages, deploys or custom domains. Its own notice says it's deprecated in favour of the **Cloudflare API MCP server (https://mcp.cloudflare.com/mcp)**, which covers the full API.
-  - If that newer connector is available, use it to create the site: Pages, or Workers with static assets, from `site/`, with custom domain `implied-open.soesraider.com` (DNS zone already on Cloudflare).
-  - Otherwise walk Matt through the dashboard: Workers & Pages → Create → Pages → Connect to Git → `menageyyc/implied-open`, preset None, no build command, output dir `site`, then Custom domains → `implied-open.soesraider.com`. Connecting to Git needs Matt's own GitHub approval in the browser either way.
-  - Then check the live URL: it loads, live prices appear, and it sends `X-Robots-Tag: noindex`.
-  - Second session (2026-11-04): still only the deprecated connector in this session; no Cloudflare API connector. Matt was given the dashboard steps. The site was not live yet (implied-open.soesraider.com did not resolve).
+- Nothing on hosting. The Montreal Exchange question below is being handled in a separate session.
 
 ## To revisit: Montreal Exchange (TSX 60 futures, SXF)
 - The m-x.ca quotes page shows live SXF bid/ask/settlement in its HTML, but the MX terms of use say content may be accessed and viewed for "strict personal, private and non-commercial use" only. They forbid retrieving, posting on the Internet or providing it to the public without the Bourse's prior authorization.
