@@ -109,6 +109,8 @@ function contractFor(root: string, target: string) {
   throw new Error(`no contract for ${target}`);
 }
 
+// Canada drivers. Since 2026-11-04 they come from the same batched context request below, so their
+// change is also measured since the last US close (before, it was vs the previous daily close).
 const DRIVERS = [
   { key: "oil", name: "Crude oil (WTI)", symbol: "CL=F" },
   { key: "gas", name: "Natural gas", symbol: "NG=F" },
@@ -131,8 +133,11 @@ const CONTEXT = [
   { key: "dax", symbol: "^GDAXI", official: true },
   { key: "ftse", symbol: "^FTSE", official: true },
   { key: "brent", symbol: "BZ=F" },
-  { key: "wti", symbol: "CL=F" },        // only for the Brent-WTI spread
+  { key: "wti", symbol: "CL=F" },        // Brent-WTI spread, and the Canada list's oil
   { key: "copper", symbol: "HG=F" },
+  { key: "gas", symbol: "NG=F" },        // Canada list
+  { key: "gold", symbol: "GC=F" },       // Canada list
+  { key: "cad", symbol: "CADUSD=X" },    // Canada list
 ] as const;
 let contextCache: { at: number; data: unknown } | null = null;
 
@@ -303,6 +308,7 @@ Deno.serve(async (req) => {
       return get(contract).then((f) => ({ ...f, contract, fallback: false }))
         .catch(() => get(`${root}=F`).then((f) => ({ ...f, contract, fallback: true })));
     };
+    const ctxP = context(now).catch((e) => ({ error: String((e as Error).message ?? e) }));
     const [pairs, drivers, bond, ctx, wcsData] = await Promise.all([
       Promise.all(PAIRS.map(async (p) => {
         const target = targetDate(p.cal, now);
@@ -310,18 +316,16 @@ Deno.serve(async (req) => {
         const refs = await futureRefs(p.cal, idx.bars, fut.symbol, fut.bars, now, five).catch(() => ({}));
         return { key: p.key, name: p.name, target, index: { ...idx, at931: open931 }, future: { ...fut, refs } };
       })),
-      Promise.all(DRIVERS.map(async (d) => {
-        try {
-          const c = await get(d.symbol);
-          const prev = c.bars.length > 1 ? c.bars[c.bars.length - 2].close : null;
-          const changePercent = prev ? ((c.price - prev) / prev) * 100 : c.changePercent;
-          return { key: d.key, name: d.name, symbol: d.symbol, label: c.label, price: c.price, time: c.time, changePercent };
-        } catch (e) {
-          return { key: d.key, name: d.name, symbol: d.symbol, error: String((e as Error).message ?? e) };
-        }
+      // Change since the last US close (0 if it hasn't traded since), from the batched context data.
+      ctxP.then((c) => DRIVERS.map((d) => {
+        // deno-lint-ignore no-explicit-any
+        const x = (c as any)?.items?.find((i: any) => i.symbol === d.symbol);
+        if (!x || x.error || x.price == null) return { key: d.key, name: d.name, symbol: d.symbol, error: x?.error ?? (c as any)?.error ?? "no data" };
+        const changePercent = x.traded && x.ref ? ((x.price - x.ref) / x.ref) * 100 : 0;
+        return { key: d.key, name: d.name, symbol: d.symbol, price: x.price, time: x.time, changePercent };
       })),
       canada10y().catch((e) => ({ error: String((e as Error).message ?? e) })),
-      context(now).catch((e) => ({ error: String((e as Error).message ?? e) })),
+      ctxP,
       wcs(now),
     ]);
     return new Response(JSON.stringify({ fetchedAt: now, source: "Yahoo Finance; Bank of Canada; Government of Alberta", pairs, drivers, canada10y: bond, context: ctx, wcs: wcsData }), {

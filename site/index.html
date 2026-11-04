@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600&display=swap">
 <style>
-/* Layout: headline summary band, five US index cards (3 + 2 on wide screens, 2 per row on tablets, stacked on phones),
+/* Layout: headline summary band, five US index cards (3 + 2 on wide screens, 2-1-2 on tablets, stacked on phones),
    a compact overnight-context strip, the Canada section, then a short "how to read this" note. */
 :root {
   --bg: #f3f5f7; --panel: #ffffff; --ink: #14202b; --muted: #5b6875; --line: #d9dfe5;
@@ -46,7 +46,7 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .note.warn { background: var(--warn-bg); color: var(--warn-ink); }
 .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 @media (min-width: 560px) { .grid { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 560px) and (max-width: 899px) { #cards > .card:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+@media (min-width: 560px) and (max-width: 899px) { #cards > .card:nth-child(3) { grid-column: 1 / -1; } }
 @media (min-width: 900px) { #cards { grid-template-columns: repeat(6, 1fr); } #cards > .card { grid-column: span 2; } #cards > .card:nth-child(n+4) { grid-column: span 3; } }
 .ctx { display: grid; gap: 10px; }
 .ctx-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -117,7 +117,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
   <div class="grid">
     <div id="ca-cards" style="display:grid;min-width:0"></div>
     <article class="card">
-      <h3>What's moving Canada overnight<span>vs last close</span></h3>
+      <h3>What's moving Canada overnight<span>since US close</span></h3>
       <ul class="drivers" id="drivers"></ul>
     </article>
   </div>
@@ -131,7 +131,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     <p><strong>Limits.</strong> It's an estimate, not a forecast or advice. Prices come from Yahoo Finance's free feed, where futures prices run about 10 minutes behind and which isn't officially supported. Futures used: E-mini S&amp;P 500 (ES), E-mini Nasdaq-100 (NQ), Mini Dow (YM), E-mini Russell 2000 (RTY). The Nasdaq Composite has no futures of its own, so it borrows the NQ percentage move. The page refreshes itself every minute.</p>
     <p><strong>Overnight context.</strong> The strip under the index cards shows what else has moved since the last US close (4 p.m. Eastern, or 1 p.m. on an early-close day): the VIX (how big a swing traders expect in the S&amp;P 500 over the next month; it's calculated from about 3:15 a.m. Eastern), the US 10-year Treasury yield, the US dollar against major currencies, European stocks, Brent crude and copper. It helps explain why futures moved, but none of it is used in the estimates. The 10-year yield on Yahoo only updates from about 8:20 a.m. Eastern; before that the tile shows the yield at the close and which way 10-year Treasury futures have moved since (futures up means yields down). Europe's stock markets trade from about 3 a.m. to 11:30 a.m. Eastern, so their change is from their own previous close. Source: Yahoo Finance.</p>
     <p><strong>Track record.</strong> <a href="/accuracy">See how close past estimates came to the real open</a>, by index and by how early the estimate was taken.</p>
-    <p><strong>Canada.</strong> Canadian index futures (TSX 60, traded on the Montreal Exchange) have no free public feed, so the TSX estimate borrows the S&amp;P 500 futures move. That makes it the roughest number on the page. The TSX usually moves in the same direction as the S&amp;P, but it leans much more on banks, energy and mining, so check the drivers. Oil, natural gas, gold and the Canadian dollar come from Yahoo Finance. The Government of Canada 10-year bond yield comes from the Bank of Canada and is updated once a day, so it shows the latest published close, not an overnight move. Western Canadian Select (WCS), Alberta's heavy oil, has no free live price: the figure shown is the monthly average published by the Government of Alberta (Economic Dashboard), about a month behind, with WTI's average for the same month. It's background for Alberta readers, not an official version of the Government of Alberta's figures, and not a guide to the open.</p>
+    <p><strong>Canada.</strong> Canadian index futures (TSX 60, traded on the Montreal Exchange) have no free public feed, so the TSX estimate borrows the S&amp;P 500 futures move. That makes it the roughest number on the page. The TSX usually moves in the same direction as the S&amp;P, but it leans much more on banks, energy and mining, so check the drivers. Oil, natural gas, gold and the Canadian dollar come from Yahoo Finance; like the overnight context strip, their change is measured since the last US close. The Government of Canada 10-year bond yield comes from the Bank of Canada and is updated once a day, so it shows the latest published close, not an overnight move. Western Canadian Select (WCS), Alberta's heavy oil, has no free live price: the figure shown is the monthly average published by the Government of Alberta (Economic Dashboard), about a month behind, with WTI's average for the same month. It's background for Alberta readers, not an official version of the Government of Alberta's figures, and not a guide to the open.</p>
   </section>
 </div>
 
@@ -139,11 +139,12 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
 (function () {
   const RELAY = "https://awagbieeouxxhytdhloi.supabase.co/functions/v1/implied-open";
   const META = {
-    // Card order: on phones top to bottom; on wide screens S&P, Nasdaq-100, Dow across the top, then Russell 2000 and Composite.
+    // Card order (Matt, 2026-11-04): S&P, Dow, Russell 2000, then the two Nasdaqs together. Wide screens: those three across
+    // the top, Nasdaq-100 and Composite below; tablets: S&P | Dow, Russell full width, Nasdaq-100 | Composite; phones: top to bottom.
     spx: { short: "S&P 500", fut: "ES", desc: "the 500 largest US companies" },
-    ndx: { short: "Nasdaq-100", fut: "NQ", desc: "large tech-heavy Nasdaq companies" },
     dji: { short: "Dow", fut: "YM", desc: "30 large blue-chip companies" },
     rut: { short: "Russell 2000", fut: "RTY", desc: "2,000 smaller US companies" },
+    ndx: { short: "Nasdaq-100", fut: "NQ", desc: "large tech-heavy Nasdaq companies" },
     ixic: { short: "Nasdaq Composite", fut: "NQ", proxy: true, desc: "nearly every Nasdaq-listed stock",
       note: (p) => `No futures trade on the Composite, so this applies the Nasdaq-100 futures move (${p}) as a stand-in. The two indexes usually move together, but the Composite also holds thousands of smaller companies, so treat this as rougher than the others.` },
     tsx: { short: "S&P/TSX Composite", fut: "ES", proxy: true, region: "ca", desc: "Canada's main stock index",
