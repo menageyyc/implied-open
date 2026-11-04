@@ -17,17 +17,20 @@ _Last updated: 2026-11-04 (hosting session)_
 
 ## Hosting and deploys
 - **Cloudflare Pages project `implied-open`** on Matt's Cloudflare account, connected to GitHub repo `menageyyc/implied-open`. Production branch `main`, no build command, output folder `site`.
-- **Deploys are automatic.** Every merge to main republishes the site in about a minute. Nothing to run by hand.
+- **Deploys are meant to be automatic** (every merge to main republishes the site in about a minute), **but this wasn't working yet on 2026-11-04.** The first deploy was started by hand through the API. When PR #7 merged, Cloudflare got no event from GitHub: no deploy, and no Cloudflare check on the commit. Most likely cause: Cloudflare's GitHub app on Matt's GitHub account only has access to selected repos, and `implied-open` isn't one of them.
+  - Fix (Matt, in the browser): GitHub → Settings → Applications → Installed GitHub Apps → **Cloudflare Workers and Pages** → Configure → Repository access → add `implied-open` → Save.
+  - Then check: push any commit (or merge the next PR) and confirm a new deployment appears under Cloudflare → Workers & Pages → `implied-open` → Deployments, with a "Cloudflare Pages" check on the GitHub commit. Once that works, delete this sub-list.
+  - Until then, deploy by hand: Cloudflare dashboard → `implied-open` → Deployments → "Create deployment" / retry, or via the API (`POST /accounts/{id}/pages/projects/implied-open/deployments` with `branch=main`).
 - **Previews:** every other branch (e.g. a `claude/*` branch with an open PR) gets its own preview link, `https://<branch>.implied-open.pages.dev`, and Cloudflare posts it on the PR. Use that link to show Matt website changes before merging.
 - **Custom domain:** `implied-open.soesraider.com`, added to the Pages project, plus one DNS record in the soesraider.com zone: `CNAME implied-open → implied-open.pages.dev`, proxied. No other records in that zone were changed (the rest are Matt's existing GoDaddy/cPanel mail records).
 - Also reachable at `https://implied-open.pages.dev` (same site).
 - **Non-crawlable, checked live 2026-11-04:** the response carries `X-Robots-Tag: noindex, nofollow, noarchive` (from `site/_headers`), `/robots.txt` disallows everything, and the page has the noindex meta tag.
 - **Checked live 2026-11-04:** loads over HTTPS, calls the Supabase function `implied-open` (HTTP 200), live prices and the Canada section render, no page errors.
-- The hosting was set up through the Cloudflare API connector; Cloudflare's GitHub app was already installed on Matt's GitHub account, so no browser step was needed.
+- The hosting was set up through the Cloudflare API connector; Cloudflare's GitHub app was already installed on Matt's GitHub account (his other Pages projects use it), so the project connected without a browser step, but see the auto-deploy caveat above.
 - To manage it by hand: Cloudflare dashboard → Workers & Pages → `implied-open`.
 
 ## Pending
-- Nothing on hosting. The Montreal Exchange question below is being handled in a separate session.
+- Hosting: Matt to give Cloudflare's GitHub app access to `implied-open` so auto-deploys work (see Hosting and deploys). The Montreal Exchange question below is being handled in a separate session.
 
 ## To revisit: Montreal Exchange (TSX 60 futures, SXF)
 - The m-x.ca quotes page shows live SXF bid/ask/settlement in its HTML, but the MX terms of use say content may be accessed and viewed for "strict personal, private and non-commercial use" only. They forbid retrieving, posting on the Internet or providing it to the public without the Bourse's prior authorization.
