@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-04 (end of first session)_
+_Last updated: 2026-11-04 (second session)_
 
 ## Status
 - The data relay is deployed and working: Supabase project "Menage", Edge Function `implied-open`, version 3. It covers four indexes, including the Nasdaq Composite (it uses NQ futures as a stand-in).
@@ -20,9 +20,12 @@ _Last updated: 2026-11-04 (end of first session)_
   - If that newer connector is available, use it to create the site: Pages, or Workers with static assets, from `site/`, with custom domain `implied-open.soesraider.com` (DNS zone already on Cloudflare).
   - Otherwise walk Matt through the dashboard: Workers & Pages → Create → Pages → Connect to Git → `menageyyc/implied-open`, preset None, no build command, output dir `site`, then Custom domains → `implied-open.soesraider.com`. Connecting to Git needs Matt's own GitHub approval in the browser either way.
   - Then check the live URL: it loads, live prices appear, and it sends `X-Robots-Tag: noindex`.
+  - Second session (2026-11-04): still only the deprecated connector in this session; no Cloudflare API connector. Matt was given the dashboard steps. The site was not live yet (implied-open.soesraider.com did not resolve).
 
 ## To revisit: Montreal Exchange (TSX 60 futures, SXF)
 - The m-x.ca quotes page shows live SXF bid/ask/settlement in its HTML, but the MX terms of use say content may be accessed and viewed for "strict personal, private and non-commercial use" only. They forbid retrieving, posting on the Internet or providing it to the public without the Bourse's prior authorization.
 - **Rule: MX data must never appear on the public site.** Don't republish it anywhere public.
 - Idea to evaluate: a **separate private, password-protected page for Matt only**, so he has his own tool that doesn't rely on Claude. For example, a second Cloudflare Pages route behind Cloudflare Access (email one-time code), with its own function fetching SXF.
 - Before building it, read the MX terms again carefully. A private page is closer to "personal use", but it still involves automated retrieval, which the terms also restrict. The clean route is to ask the Bourse for permission (offer drafted, not yet written) or use a licensed data vendor. Give Matt a clear recommendation and let him decide.
+- Second session: terms re-read in full (no date on the page; the Bourse can change them without notice). The licence is to "access, view and download or print a copy" for personal use; "retrieve", "reproduce" and "create works derived from the Content" all need the Bourse's prior authorization, and that list isn't limited to public use. A private page that fetches SXF automatically is retrieval and reproduction, so a password doesn't fix it. There's no clause on scraping and no named permissions contact.
+- Recommendation given to Matt: (1) add a plain link to the m-x.ca SXF quote page (a link copies no data, so it's fine even on the public site); (2) if he wants the private calculated page, email the Bourse first and build only after a written yes. Waiting on Matt's decision.
