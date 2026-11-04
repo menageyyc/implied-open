@@ -436,7 +436,8 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     // US 10-year: the yield when Yahoo has a fresh one (about 8:20 a.m. to the afternoon), otherwise
     // the yield at the close plus which way 10-year T-note futures have moved (price up = yield down).
     const t = d.tnx, z = d.zn;
-    if (moved(t) && !t.stale) {
+    // Any yield print since the US close counts (Yahoo's yield stops updating mid-afternoon; keep showing the day's change).
+    if (moved(t)) {
       const bp = Math.round((t.price - t.ref) * 100);
       out.push(tile("US 10-year yield", fmt(t.price) + "%", `${bp > 0 ? "+" : bp < 0 ? "−" : ""}${Math.abs(bp)} bp`, bp === 0 ? "Unchanged. (1 bp = 0.01 percentage points.)" : bp > 0 ? "Higher yields tend to weigh on stocks, small companies most." : "Lower yields tend to help stocks, small companies most."));
     } else if (ok(t) && moved(z)) {
