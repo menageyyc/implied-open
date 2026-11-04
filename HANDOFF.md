@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-04 (MX session: data check done, waiting on Matt)_
+_Last updated: 2026-11-04 (MX session: decisions made, waiting on Matt's Zero Trust setup)_
 
 ## Status
 - The data relay is deployed and working: Supabase project "Menage", Edge Function `implied-open`, version 4 (adds the Canada data). It covers four US indexes plus the TSX, including the Nasdaq Composite (it uses NQ futures as a stand-in).
@@ -53,7 +53,13 @@ What Matt was told, and accepted: the MX terms need the Bourse's prior authoriza
 - **Cloudflare Access is not enabled** on Matt's account (API returns "Access is not enabled"). Per Cloudflare's setup docs, Matt must enable Zero Trust once in the dashboard: pick a team name, choose the Free plan, and enter payment details (required even on Free; not charged).
 - **Hostname gotcha:** a two-level name like `me.implied-open.soesraider.com` isn't covered by Cloudflare's free certificate (it only covers one level, `*.soesraider.com`). Use a one-level name such as `implied-open-me.soesraider.com`.
 - **Design notes for build:** besides Access on the hostname, the Pages Function should itself check the Access login token (`Cf-Access-Jwt-Assertion`) and refuse requests without a valid one, so the data can't leak through the `*.pages.dev` address or a preview link even if an Access setting is missed. Private site should share the public page's code rather than be a hand-copied second page.
-- Waiting on Matt's answers (structure A/B, hostname, show both TSX estimates, permission email). Nothing built yet.
+- **Matt's answers, 2026-11-04:** (1) Option A: public site unchanged, separate private copy. (2) Private hostname `implied-open-pvt.soesraider.com`. (3) Show both TSX estimates: SXF-based as the main one, S&P 500-futures-based as a comparison line. (4) He'll enable Zero Trust (Free plan, card on file) himself. (5) Permission email drafted for Matt to send himself (to TMX Datalinx, marketdata@tmx.com, which handles MX data authorization); **never send email on Matt's behalf**. Login method: emailed one-time code (default); "Sign in with Google" can be added later.
+- Login reality told to Matt: one login per browser/device per month at most (Cloudflare's max session is one month); clearing cookies or private windows mean logging in again.
+- **Build plan / safety notes:**
+  - The public Pages project `implied-open` has root dir = repo root and reads Pages Functions from `/functions`. **Never create a top-level `functions/` folder**, or the public site would pick it up. Private code lives under `private/` (its own `private/functions/`).
+  - Private Pages project: root dir `private`, a build step copies `../site` and adds the SXF script, so there's one page to maintain. Previews turned off for it.
+  - A `_middleware.js` on the private project checks the Access login token on every request (page and data) and **fails closed**: no valid token, or Access settings missing, means 403. That makes the order of setup safe (Cloudflare docs: a custom domain can't be added to Pages once Access already covers that hostname, so domain first, Access after).
+  - Access app to cover `implied-open-pvt.soesraider.com` and `implied-open-pvt.pages.dev` (see Cloudflare Pages "Known issues: Enable Access on your *.pages.dev domain"), allow only menageyyc@gmail.com, session 1 month.
 
 **Tools:** the Cloudflare API connector (`mcp__CloudFlare_MCP__*` tools: search / execute / docs) does Pages, DNS and Access. Supabase connector for the existing function. Show Matt screenshots (and the private URL working after login, plus proof that a logged-out request is blocked) and get his approval before merging any site change.
 
