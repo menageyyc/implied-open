@@ -119,3 +119,8 @@ $$);
 -- project (they share the log), which is harmless: it's only a history of runs.
 select cron.schedule('cron-run-log-cleanup', '17 8 * * *',
   $$delete from cron.job_run_details where end_time < now() - interval '7 days'$$);
+
+-- 9:31 level (added 2026-11-04, migration implied_open_price_931): the fully formed open. The first
+-- printed open is partly built from previous closes (Dow captures ~50% of the real gap at 9:30:00).
+-- Filled for 2026-10-06 onward from Yahoo 1-minute bars (close of the 9:30 bar); earlier days have none.
+alter table implied_open.actuals add column if not exists price_931 numeric;
