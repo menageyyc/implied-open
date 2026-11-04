@@ -6,6 +6,8 @@ A single web page that estimates where the S&P 500, Nasdaq-100, Nasdaq Composite
 - `site/index.html`: the page.
 - `site/robots.txt`, `site/_headers`: keep search engines out. The page also carries a `noindex` meta tag.
 - `supabase/functions/implied-open/index.ts`: the data relay.
+- `site/accuracy.html`: the track-record page (https://implied-open.soesraider.com/accuracy).
+- `supabase/functions/implied-open-accuracy/index.ts` + `supabase/accuracy.sql`: the accuracy logger and its database setup.
 - `private/`: Matt's login-protected version (https://implied-open-pvt.soesraider.com), a separate Cloudflare Pages project. It builds from `site/` and adds a TSX estimate from Montreal Exchange SXF futures. See HANDOFF.md, "Private SXF site".
 
 ## Where the data comes from
@@ -22,3 +24,9 @@ The function fetches fixed symbols from Yahoo's free, unofficial chart feed. Ind
 
 ## Caveats
 Yahoo futures prices are about 10 minutes delayed. The feed is unofficial and may change. Market holidays aren't handled.
+
+## Accuracy tracking
+- Every 5 minutes, a scheduled job in the Supabase database (pg_cron job `implied-open-accuracy-tick`) calls the Edge Function `implied-open-accuracy`. From 6 p.m. to 9:30 a.m. Eastern it saves the implied open for each index, using the page's formula, filed under the futures price's time (Yahoo's futures run about 10 minutes behind). On weekdays from 9:40 to 10:30 a.m. and at 4:30 p.m. it saves the actual official open and the index level at 9:35 a.m.
+- Data lives in the database schema `implied_open` (tables `snapshots` and `actuals`), which isn't exposed through Supabase's API. The function reads it over a direct database connection. Its GET returns a JSON summary for the page with no key needed. Its POST needs a shared secret stored in Supabase Vault (`implied_open_log_secret`).
+- History from Aug 26 to Nov 4, 2026 was rebuilt from Yahoo's 5-minute futures history (marked "rebuilt" on the page). Live snapshots start Nov 4, 2026.
+- Futures contract-switch days (Tuesday of a quarterly expiry week through the following Monday) are flagged and left out of the averages by default. Yahoo's intraday and daily futures series switch to the next contract on different days, which made September 2026's estimates about 1% too high on those days.
