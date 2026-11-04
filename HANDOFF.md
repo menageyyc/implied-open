@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-04 (9:31 open + holidays approved by Matt and LIVE: relay v6, logger v4, PR #20 merged; see "Built: 9:31 open and holidays")_
+_Last updated: 2026-11-04 (11 scheduled checks set up, see "Scheduled checks"; trader explainer and extra-data research added in notes/. Earlier the same day: 9:31 open + holidays LIVE, relay v6, logger v4, PR #20 merged)_
 
 ## Start here (fresh session)
 - **9:31 open + holidays: LIVE since 2026-11-04** (Matt approved; relay `implied-open` v6 and logger `implied-open-accuracy` v4 deployed with `verify_jwt: false`, PR #20 merged). Matt said: leave the first printed open off the page. First real tests: Thu Nov 5 9:30-9:32 (opening state then 9:31 level), Nov 25-27 (Thanksgiving and the 1 p.m. close), Dec 24-29. See "Built: 9:31 open and holidays" and open item 0a. If a question needs deep judgment (method soundness, data reliability, security, legal exposure), say so and suggest raising the effort first.
@@ -11,11 +11,36 @@ _Last updated: 2026-11-04 (9:31 open + holidays approved by Matt and LIVE: relay
 - **Accuracy tracker (2026-11-04):** live at https://implied-open.soesraider.com/accuracy, approved and merged by Matt. The logger collects every 5 minutes. Matt wants to look at it live and may ask for changes. At his request the default comparison is the official open (9:35 price is the alternative). See "Accuracy tracker" below.
 - **Open items:**
   0. **Done 2026-11-04:** the three changes in "Build brief: 9:31 open and holidays" (approved, deployed, merged).
-  0a. **Calendar checks (after deploy):** Wed Nov 25 evening: US cards say "next open Fri Nov 27", TSX says Thu Nov 26. Fri Nov 27 after 1 p.m.: cards say "Futures at that close (1:00 PM ET)"; check that the 1 p.m. price matches Yahoo's 5-minute ESZ26.CME bar ending 1:00 p.m. (first chance to confirm the early-close rule with 5-minute data). Fri Nov 27 morning: TSX card's futures line says "last price before that close". Dec 24, 28, 29 similarly. **Extend the holiday lists to 2028 by Nov 2027** (three copies: `site/index.html`, both functions).
+  0a. **Calendar checks (after deploy):** Wed Nov 25 evening: US cards say "next open Fri Nov 27", TSX says Thu Nov 26. Fri Nov 27 after 1 p.m.: cards say "Futures at that close (1:00 PM ET)"; check that the 1 p.m. price matches Yahoo's 5-minute ESZ26.CME bar ending 1:00 p.m. (first chance to confirm the early-close rule with 5-minute data). Fri Nov 27 morning: TSX card's futures line says "last price before that close". Dec 24, 28, 29 similarly. (All of these, Dec 29 excepted, are scheduled to run themselves: see "Scheduled checks".) **Extend the holiday lists to 2028 by Nov 2027** (three copies: `site/index.html`, both functions).
   1. **Matt to send the permission email** to TMX Datalinx (marketdata@tmx.com), text in `notes/mx-permission-email.md` (already worded for a page that is live). Matt sends it himself; never send email on his behalf. If the Bourse says no, take the MX feed down (see "If the Bourse says no" below).
-  2. **Evening check:** one weekday after 8 p.m. ET, confirm the private page's SXF number looks sensible (that m-x.ca's settlement has rolled to that day's). If it hasn't, widen the paused window in `private/sxf.js`.
+  2. **Evening check:** one weekday after 8 p.m. ET, confirm the private page's SXF number looks sensible (that m-x.ca's settlement has rolled to that day's). If it hasn't, widen the paused window in `private/sxf.js`. Scheduled for Thu Nov 5, 8:07 p.m. ET.
   3. Optional, offered to Matt: "Sign in with Google" instead of the emailed code (needs a Google Cloud OAuth client, ~15 min with Matt). Optional: rename the Zero Trust team `small-credit-1e44`.
+  4. **Extra data (asked 2026-11-04, nothing built):** options researched in `notes/dashboard-ideas.md` (Russell 2000 implied open, VIX, rates, dollar, Europe, Brent, copper; Alberta WCS/WTI and gas from the Government of Alberta's free monthly API; no reliable free daily/live WCS exists). Waiting for Matt to pick. Any of it is a website change: screenshots + approval first.
+- **Scheduled checks (set up 2026-11-04):** 11 one-off checks run themselves at the right times; see "Scheduled checks" below. Each records its result here.
+- **Explainer for friends/traders:** `notes/market-explainer.md` (one paragraph, numbers verified).
 - **Hard rules:** MX data must never be reachable without logging in (page, `/api/sxf`, any preview or deployment link). Never put the MX fetch in the public Supabase function or in `site/`. Never create a top-level `functions/` folder (the public Pages project would serve it).
+
+## Scheduled checks (set up 2026-11-04)
+Each check has its own session (repo attached, so it can read these notes and merge a notes-only PR), created idle on 2026-11-04 and woken by a one-off scheduled task. Each one checks, reports to Matt (summary in the session plus a phone notification), and adds a dated result line to this file. None may change the site, functions or database; a problem gets diagnosed and a fix proposed to Matt. Times are ET.
+
+| When (ET) | Check | Model | Scheduled task | Session |
+|---|---|---|---|---|
+| Thu Nov 5, 2026, 8:41 a.m. (waits for 9:29-9:36) | First live 9:31 open + first night of live logging | Sonnet | trig_014Gvys2w5R8VVDHjfcTkxRg | session_0185JzKCYLyRcm84yKLkA4Q7 |
+| Thu Nov 5, 2026, 8:07 p.m. | SXF settlement after 8 p.m. (open item 2; may fetch m-x.ca up to 4 times) | Sonnet | trig_015nEswwuN1aqd1ABytEBnks | session_0185JzKC2QA6vSQyfdiyNxZ6 |
+| Wed Nov 25, 2026, 7:13 p.m. | Thanksgiving eve: US targets Fri Nov 27, TSX Thu Nov 26 | Sonnet | trig_01VV39wvEhHnViTCitsY2VLp | session_0185JzKD6U1nG6AWok98SGx1 |
+| Fri Nov 27, 2026, 7:37 a.m. | TSX "last price before that close" after the US holiday | Sonnet | trig_0111JbXcL5siyzs5AySgYxAz | session_0185JzKBpLP2wXHRJYdWH8g6 |
+| Fri Nov 27, 2026, 2:23 p.m. | First 1 p.m. early close: 1:00 p.m. futures reference | Sonnet | trig_01UHYn5fdGxJePGf67NW37qY | session_0185JzKAumGYgNsExNRjGVxX |
+| Wed Dec 2, 2026, 1:17 p.m. | Live vs rebuilt (all rows), live accuracy, H27 contracts served | Opus | trig_01H8DRe5Yv9agpDiDNzJxmVt | session_0185JzKAe6h5rBKcWjxZN2Ni |
+| Mon Dec 14, 2026, 12:41 p.m. | Contract switch to H27 | Opus | trig_01LE384q6G9gv1g2ov6Dz82g | session_0185JzKEdRsbTi4GQreqULvi |
+| Thu Dec 24, 2026, 2:17 p.m. | Christmas Eve 1 p.m. close (NYSE and TSX) | Sonnet | trig_01JjV4UZxkti8g68MvUgQAxw | session_0185JzKEUFEHwdhASVafikbq |
+| Mon Dec 28, 2026, 7:43 a.m. | Boxing Day: US open, TSX closed | Sonnet | trig_01NoroscE9Dfaw1dM9UVy3Hm | session_0185JzKDeqRfeWyTQ7GRsEhT |
+| Tue Feb 16, 2027, 1:23 p.m. | 100-day method review (Composite scale, TSX model); asks Matt about a Mar 15 check | Opus | trig_016pTydmkhAftzGogCcY1DaQ | session_0185JzKBcHb21u9avW1qQsk3 |
+| Mon Nov 1, 2027, 1:13 p.m. | Extend holiday lists to 2028 (code change on a branch; Matt approves before merge/deploy) | Opus | trig_014Y6QuuaLAtsRcq3UU2oqAJ | session_0185JzKDnxavrAe7qGUiVxw2 |
+
+- Morning checks start before 6 a.m. Pacific on purpose, because scheduled runs that start 6-9 a.m. Pacific can be delayed.
+- Why sessions and not "fresh session each time": a test on 2026-11-04 showed scheduled fresh sessions start with no repository and no GitHub tools, so they couldn't read these notes or record results. Sessions created with the repo attached can (tested: checkout present, push auth OK, PR tools and phone notifications available).
+- To change one: edit the scheduled task (prompt, time, or model) rather than deleting it; the sessions are tagged `implied-open-checks`.
+- Not scheduled (offered to Matt): Mon Mar 15, 2027 contract switch to M27 (same mechanism as Dec 14; the Feb review asks him).
 
 ## Contract-switch fix (built 2026-11-04)
 - **What changed:** the relay (`implied-open`) and the logger (`implied-open-accuracy`) no longer use Yahoo's continuous `ES=F`/`NQ=F`/`YM=F`. Each picks one quarterly contract by the date of the open being estimated (`contractFor()`, e.g. `ESZ26.CME`, `NQZ26.CME`, `YMZ26.CBT`) and uses it for both the live price and the reference close. Switch to the next contract from the Monday of expiry week (next: Mon Dec 14, 2026 → H27; Mon Mar 15, 2027 → M27). The relay falls back to `ES=F` etc. if Yahoo stops serving the specific contract. `site/index.html` is unchanged (the page formula didn't need to change), so the private build is unaffected (`node build.mjs` passes).
