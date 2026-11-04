@@ -49,6 +49,12 @@ button:disabled { opacity: 0.6; cursor: wait; }
 @media (min-width: 560px) and (max-width: 899px) { #cards > .card:nth-child(3) { grid-column: 1 / -1; } }
 @media (min-width: 900px) { #cards { grid-template-columns: repeat(6, 1fr); } #cards > .card { grid-column: span 2; } #cards > .card:nth-child(n+4) { grid-column: span 3; } }
 .ctx { display: grid; gap: 10px; }
+.links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.links a { display: grid; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; text-decoration: none; color: var(--ink); }
+.links a:hover { border-color: var(--accent); }
+.links a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.links strong { color: var(--accent); font-weight: 600; }
+.links span { font-size: 0.82rem; color: var(--muted); }
 .ctx-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 @media (min-width: 560px) { .ctx-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 900px) { .ctx-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
@@ -108,6 +114,11 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     <div class="section-h"><h2>Overnight context</h2><p id="ctx-sub">Change since the last US close. Background only: none of this feeds into the estimates.</p></div>
     <ul class="ctx-grid" id="ctx"></ul>
   </section>
+
+  <nav class="links" aria-label="More">
+    <a href="/explain"><strong>How it works →</strong><span>The method in plain words, and how accurate it is</span></a>
+    <a href="/accuracy"><strong>Track record →</strong><span>Every past estimate against the real open</span></a>
+  </nav>
 
   <div class="section-h"><h2>Canada</h2><p>The TSX opens at 9:30 a.m. Eastern too.</p></div>
   <section class="summary" aria-live="polite">

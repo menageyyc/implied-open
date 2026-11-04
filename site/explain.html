@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>How It Works · Implied Open</title>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="How the Implied Open estimate works and how accurate it has been.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600&display=swap">
+<style>
+/* Same look as the main page. Layout: header, short sections in one readable column, accuracy table. */
+:root {
+  --bg: #f3f5f7; --panel: #ffffff; --ink: #14202b; --muted: #5b6875; --line: #d9dfe5; --accent: #1f5f8b; --flat-bg: #e9edf1;
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f161d; --panel: #17212b; --ink: #e6ecf1; --muted: #93a1ae; --line: #2a3742; --accent: #6fb0dd; --flat-bg: #22303c; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 28px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 2rem; line-height: 1.1; margin: 0; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 60ch; }
+a { color: var(--accent); }
+.back { font-weight: 500; text-decoration: none; padding: 10px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; }
+.back:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: grid; gap: 10px; min-width: 0; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 1.2rem; margin: 0; }
+p, ul { margin: 0; }
+ul { padding-left: 1.2em; display: grid; gap: 4px; }
+.muted { color: var(--muted); font-size: 0.88rem; }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font-weight: 500; color: var(--muted); font-size: 0.8rem; }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+th.n { text-align: right; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>How it works</h1>
+      <p class="sub">What Implied Open does, and how close it has come.</p>
+    </div>
+    <a class="back" href="/">← Back to Implied Open</a>
+  </header>
+
+  <section>
+    <h2>What it does</h2>
+    <p>US stocks stop trading at 4 p.m. Eastern, but futures on the major indexes trade almost around the clock. Whatever happens overnight (Asia and Europe, after-hours earnings, the 8:30 a.m. economic reports) shows up in futures long before the 9:30 open. Implied Open turns that overnight futures move into an expected opening level for the S&amp;P 500, Nasdaq-100, Dow, Russell 2000, Nasdaq Composite and Toronto's TSX.</p>
+  </section>
+
+  <section>
+    <h2>How the estimate is made</h2>
+    <ul>
+      <li><strong>Implied open = last close + how far the futures have moved since that close.</strong> Futures used: E-mini S&amp;P 500, E-mini Nasdaq-100, Mini Dow and E-mini Russell 2000.</li>
+      <li>The Nasdaq Composite and the TSX have no free futures feed, so they borrow the Nasdaq-100 and S&amp;P 500 moves. Treat those two as rougher.</li>
+      <li>Quarterly contract rolls, market holidays and 1 p.m. early closes are handled automatically.</li>
+      <li>Prices come from Yahoo Finance; futures run about 10 minutes behind. The page refreshes every minute.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>After the bell</h2>
+    <p>From 9:30 the page shows where each index actually opened: its level at 9:31, after the first full minute of trading. The "official" first print comes out at 9:30:00, before many stocks have traded, so it still counts them at yesterday's prices and lags the real move. On the Dow it typically shows only about half of the overnight gap.</p>
+  </section>
+
+  <section>
+    <h2>An example: the morning after the 2026 midterms</h2>
+    <ul>
+      <li>At 1:30 a.m., the S&amp;P 500 was implied 0.3% lower. By 5:30 a.m. it was implied 1.0% higher.</li>
+      <li>At 9:20 the page said 7,661 (+1.2%). At 9:31 the index stood at 7,659.</li>
+      <li>The first print showed only 7,636 (+0.9%). The Dow's first print said +1.2%; a minute later it was +1.9%.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>How accurate it is</h2>
+    <p>The estimate the page showed just before 9:30 (built from 9:20 futures prices, given the 10-minute delay), compared with the level at 9:31. 50 trading days, Aug 26 to Nov 4, 2026 (Russell 2000: 38 days).</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Index</th><th class="n">Average miss</th><th class="n">Direction right</th></tr></thead>
+        <tbody>
+          <tr><td>S&amp;P 500</td><td class="n">0.08%</td><td class="n">96%</td></tr>
+          <tr><td>Russell 2000</td><td class="n">0.10%</td><td class="n">95%</td></tr>
+          <tr><td>Nasdaq-100</td><td class="n">0.14%</td><td class="n">96%</td></tr>
+          <tr><td>Dow</td><td class="n">0.18%</td><td class="n">94%</td></tr>
+          <tr><td>Nasdaq Composite</td><td class="n">0.20%</td><td class="n">92%</td></tr>
+          <tr><td>S&amp;P/TSX</td><td class="n">0.29%</td><td class="n">84%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>For comparison, assuming the market opens unchanged misses by 0.4–0.7% on average. Estimates in the small hours are rougher: about 0.3% for the S&amp;P 500 at 1:30 a.m. <a href="/accuracy">Day-by-day track record</a>.</p>
+  </section>
+
+  <section>
+    <h2>The rest of the page</h2>
+    <p>The overnight context strip (VIX, US 10-year yield, US dollar, Europe, Brent, copper) and the Canada list (oil, natural gas, gold, the loonie, Canada's 10-year, WCS) show what else has moved since the close. They help explain the futures move but aren't part of the estimate.</p>
+    <p class="muted">An estimate, not advice. Free, unofficial data feed. Days before Nov 4, 2026 were rebuilt from price history; live tracking started Nov 4.</p>
+  </section>
+</div>
+</body>
+</html>
