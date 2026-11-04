@@ -13,7 +13,7 @@ revoke all on schema implied_open from public, anon, authenticated;
 
 create table implied_open.snapshots (
   target_date date not null,          -- the trading day whose 9:30 a.m. ET open is being estimated
-  key text not null,                  -- spx, ndx, ixic, dji, tsx
+  key text not null,                  -- spx, ndx, ixic, dji, rut (from 2026-11), tsx
   horizon_min int not null,           -- minutes from the futures price's time to 9:30 a.m. ET on target_date
   data_time timestamptz not null,     -- time of the futures price used
   implied numeric not null,           -- implied open

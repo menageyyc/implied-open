@@ -1,10 +1,37 @@
-# Implied Open: one-paragraph explainer (for traders and market watchers)
+# Implied Open: explainer for traders
 
-_Written 2026-11-04. The Nov 4 numbers below were checked against Yahoo's raw index and futures data (prices recomputed independently, matched the tracker exactly)._
+_Rewritten 2026-11-04 (shorter, for people who trade). Numbers from the accuracy tracker database on 2026-11-04; see "Sources" below._
 
-Implied Open answers the question every trader asks before the bell: where will the cash indexes actually open? The S&P 500, Nasdaq-100 and Dow stop trading at 4 p.m. ET, but E-mini futures on them trade almost 23 hours a day, so whatever happens overnight (election returns, Asia and Europe, after-hours earnings, the 8:30 a.m. economic releases) is priced into futures long before 9:30. The page converts that overnight futures move into index points: it takes the change in the quarterly contract since the 4 p.m. cash close and adds it to the last close, which carries the prior day's closing futures-to-cash basis forward instead of modelling fair value (the carry difference is about a basis point a day). The Nasdaq Composite and the S&P/TSX are estimated from the NQ and ES percentage moves, with oil, natural gas, gold, the Canadian dollar and Canada's 10-year shown alongside for the TSX, and contract rolls, holidays and 1 p.m. early closes are handled automatically. After the bell it shows the level at 9:31, the first full minute of trading, because the official first print is partly yesterday's prices for stocks that haven't traded yet; on average it captures only about half of the Dow's overnight gap. The morning after the 2026 midterms is a good example: at 1:30 a.m. the S&P 500 was implied 0.3% lower, by 5:30 a.m. 1.0% higher, and at 9:20 the page said 7,661 (+1.2%). At 9:31 the index stood at 7,659, while the first print showed only 7,636 (+0.9%); the Dow's first print said +1.2% when it was really +1.9% a minute later. Over the past two months the 9:20 estimate has missed the S&P open by less than 0.1% on average and called the direction right 96–98% of the time, against a 0.4% average miss for assuming no change. Estimates in the small hours are rougher (about 0.3%), and the futures feed runs roughly 10 minutes behind.
+**What it is.** A pre-market estimate of the 9:30 ET cash open for the S&P 500, Nasdaq-100, Dow, Russell 2000, Nasdaq Composite and S&P/TSX. Updates every minute. https://implied-open.soesraider.com
+
+**Method.**
+- Implied open = last cash close + point change in the index future since the 4:00 p.m. close (ES, NQ, YM, RTY; front quarterly contract, rolled on the Monday of expiry week).
+- The prior close's futures-cash basis is carried forward; no fair-value model (carry is about 1 bp a day).
+- Composite and TSX have no usable free futures: they take the NQ and ES percentage move, so treat them as rough.
+- Holidays and 1 p.m. early closes handled.
+- Data: Yahoo Finance; futures about 10 minutes delayed.
+
+**After the bell** it shows the level at 9:31 (first full minute), not the first print. The first print is partly stale prices: on the Dow it typically captures only about half of the overnight gap.
+
+**Context strip** (VIX, US 10-year, dollar index, Euro Stoxx 50, Brent, copper; change since the US close) is background only. None of it feeds the estimate.
+
+**Accuracy.** Estimate taken with 9:20 a.m. futures, compared with the 9:31 level (9:35 before Oct 6, when no 1-minute data exists). 50 sessions, Aug 26 – Nov 4, 2026; Russell 38 sessions from Sep 14.
+
+| Index | Avg miss | 9 days in 10 within | Direction right | "No change" avg miss |
+|---|---|---|---|---|
+| S&P 500 | 0.08% | 0.18% | 96% | 0.40% |
+| Russell 2000 | 0.10% | 0.19% | 95% | 0.46% |
+| Nasdaq-100 | 0.14% | 0.27% | 96% | 0.68% |
+| Dow | 0.18% | 0.36% | 94% | 0.41% |
+| Nasdaq Composite (proxy) | 0.20% | 0.46% | 92% | 0.62% |
+| S&P/TSX (proxy) | 0.29% | 0.60% | 84% | 0.41% |
+
+Earlier is rougher: S&P 500 average miss 0.19% at 5:30 a.m., 0.29% at 1:30 a.m. Live day-by-day record: https://implied-open.soesraider.com/accuracy
+
+**Limits.** An estimate, not advice. Free, unofficial data feed. Days before Nov 4, 2026 were rebuilt from price history; live tracking started Nov 4.
 
 ## Sources for the numbers
-- Nov 4, 2026 example: S&P 500 close Nov 3 7,568.92; implied at futures time 1:30 a.m. −0.30%, 5:30 a.m. +1.01%, 9:20 a.m. 7,661.17 (+1.22%); 9:31 level 7,658.74 (+1.19%); first print 7,635.81 (+0.88%). Dow: close Nov 3 51,786.72; 9:20 estimate +2.25%; 9:31 level 52,761 (+1.88%); first print 52,410.23 (+1.20%). From the tracker (`/accuracy` data) and recomputed from Yahoo's ^GSPC/^DJI 1-minute bars and ESZ26.CME/YMZ26.CBT 5-minute and daily bars.
-- Track record and first-print share: HANDOFF.md, "Methodology review" and "Accuracy tracker" (45 clean days; S&P 0.065–0.09% depending on yardstick; direction 96–98%; no-change 0.39%; 1:30 a.m. 0.30%; Dow first print captures 51% of the futures-implied gap).
-- Carry: HANDOFF.md methodology review (carry and ex-dividend effects about 0.01% a day).
+- Accuracy table: `implied_open.snapshots` joined to `implied_open.actuals`, horizon 10 min (9:20 a.m. futures time), actual = `price_931`, else `price_935`; queried 2026-11-04 after the Russell 2000 backfill. Avg miss = mean |implied − actual| / actual; "9 days in 10" = 90th percentile of that; direction = sign(implied − prev close) = sign(actual − prev close); "no change" = mean |prev close − actual| / actual. All days counted, including contract-switch days. TSX is shown against 9:31 here for consistency; against 9:35 (the tracker's TSX default) its average miss is about the same (0.29% in the methodology review).
+- 5:30 / 1:30 a.m. figures: same query at horizons 240 and 480 min (S&P 0.190% and 0.286%).
+- Dow first print capturing about half the gap: HANDOFF.md, "Methodology review" (51% over 45 days).
+- Carry about 1 bp a day: HANDOFF.md, "Methodology review".

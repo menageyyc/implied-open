@@ -1,6 +1,7 @@
-// Read-only relay: fetches index closes, index futures and a few market drivers
-// from Yahoo Finance's public chart feed, plus the Government of Canada 10-year
-// benchmark yield from the Bank of Canada's Valet API, and returns them with
+// Read-only relay: fetches index closes, index futures, a few market drivers and an overnight
+// context row from Yahoo Finance's public chart feed, plus the Government of Canada 10-year
+// benchmark yield from the Bank of Canada's Valet API and the monthly WCS heavy-oil price from
+// the Government of Alberta, and returns them with
 // CORS headers so a browser page can read them. Symbols are fixed, so this
 // cannot be used as an open proxy.
 // Proxies: the Nasdaq Composite uses Nasdaq-100 futures and the S&P/TSX
@@ -15,9 +16,10 @@ const PAIRS = [
   { key: "ndx", name: "Nasdaq-100", index: "^NDX", future: "NQ", cal: "us" },
   { key: "ixic", name: "Nasdaq Composite", index: "^IXIC", future: "NQ", cal: "us" },
   { key: "dji", name: "Dow Jones", index: "^DJI", future: "YM", cal: "us" },
+  { key: "rut", name: "Russell 2000", index: "^RUT", future: "RTY", cal: "us" },
   { key: "tsx", name: "S&P/TSX Composite", index: "^GSPTSE", future: "ES", cal: "ca" },
 ] as const;
-const EXCHANGE: Record<string, string> = { ES: "CME", NQ: "CME", YM: "CBT" };
+const EXCHANGE: Record<string, string> = { ES: "CME", NQ: "CME", YM: "CBT", RTY: "CME" };
 const OPEN_MIN = 570; // 9:30 a.m.
 
 // ---------- Market calendars ----------
@@ -107,12 +109,106 @@ function contractFor(root: string, target: string) {
   throw new Error(`no contract for ${target}`);
 }
 
+// Canada drivers. Since 2026-11-04 they come from the same batched context request below, so their
+// change is also measured since the last US close (before, it was vs the previous daily close).
 const DRIVERS = [
   { key: "oil", name: "Crude oil (WTI)", symbol: "CL=F" },
   { key: "gas", name: "Natural gas", symbol: "NG=F" },
   { key: "gold", name: "Gold", symbol: "GC=F" },
   { key: "cad", name: "Canadian dollar (US$)", symbol: "CADUSD=X" },
 ];
+
+// Overnight context row (not used in any estimate): fixed symbols, fetched together in ONE Yahoo
+// "spark" request (5-minute bars, last 5 days) and cached for a minute, so open tabs add at most
+// one Yahoo request a minute between them. Change is measured since the last US cash close
+// (4 p.m., or 1 p.m. on early-close days): the price at that moment from the 5-minute bars.
+const CONTEXT = [
+  { key: "vix", symbol: "^VIX" },        // S&P 500 volatility index; calculated from about 3:15 a.m. ET
+  { key: "tnx", symbol: "^TNX" },        // US 10-year yield (percent); updates from about 8:20 a.m. ET
+  { key: "zn", symbol: "ZN=F" },         // 10-year T-note futures (price): the overnight stand-in for the yield
+  { key: "dxy", symbol: "DX-Y.NYB" },    // US dollar index
+  // Europe trades about 3 a.m. to 11:30 a.m. ET, so it always closes before the US does. Its change is
+  // measured from its official previous close (the closing auction), which the last 5-minute bar misses.
+  { key: "stoxx", symbol: "^STOXX50E", official: true }, // Euro Stoxx 50
+  { key: "dax", symbol: "^GDAXI", official: true },
+  { key: "ftse", symbol: "^FTSE", official: true },
+  { key: "brent", symbol: "BZ=F" },
+  { key: "wti", symbol: "CL=F" },        // Brent-WTI spread, and the Canada list's oil
+  { key: "copper", symbol: "HG=F" },
+  { key: "gas", symbol: "NG=F" },        // Canada list
+  { key: "gold", symbol: "GC=F" },       // Canada list
+  { key: "cad", symbol: "CADUSD=X" },    // Canada list
+] as const;
+let contextCache: { at: number; data: unknown } | null = null;
+
+// The last US cash close at or before `now` (ms), by the US calendar.
+function lastUsClose(now: number) {
+  let d = et(now).date;
+  for (let i = 0; i < 15; i++, d = addDays(d, -1)) {
+    if (isTradingDay("us", d) && etToMs(d, closeMin("us", d)) <= now) return { date: d, ms: etToMs(d, closeMin("us", d)) };
+  }
+  throw new Error("no US close in the last 15 days");
+}
+
+async function context(now: number) {
+  if (contextCache && now - contextCache.at < 60000) return contextCache.data;
+  const syms = CONTEXT.map((c) => c.symbol).join(",");
+  const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/spark?symbols=${encodeURIComponent(syms)}&range=5d&interval=5m`,
+    { headers: { "User-Agent": "Mozilla/5.0" } });
+  if (!res.ok) throw new Error(`context: HTTP ${res.status}`);
+  const j = await res.json();
+  const close = lastUsClose(now);
+  const items = CONTEXT.map((c) => {
+    const s = j?.[c.symbol];
+    const ts: number[] = s?.timestamp ?? [], cl: (number | null)[] = s?.close ?? [];
+    let ref: number | null = null, refTime: number | null = null, price: number | null = null, time: number | null = null;
+    for (let i = 0; i < ts.length; i++) {
+      if (cl[i] == null) continue;
+      if ((ts[i] + 300) * 1000 <= close.ms) { ref = cl[i]; refTime = ts[i] + 300; }
+      price = cl[i]; time = Math.min(ts[i] + 300, Math.floor(now / 1000));
+    }
+    if (price == null) return { key: c.key, symbol: c.symbol, error: "no data" };
+    if ("official" in c && time! * 1000 > close.ms && isFinite(s?.previousClose)) { ref = s.previousClose; refTime = null; }
+    // traded = has traded since the US close; stale = no new price for 30+ minutes (closed or paused).
+    return { key: c.key, symbol: c.symbol, price, time, ref, refTime,
+      traded: time! * 1000 > close.ms, stale: now - time! * 1000 > 30 * 60000 };
+  });
+  const data = { usClose: close, items };
+  contextCache = { at: now, data };
+  return data;
+}
+
+// Western Canadian Select and WTI monthly averages (US$/bbl) from the Government of Alberta's
+// Economic Dashboard API (no key; published about a month behind). Terms (economicdashboard.alberta.ca/disclaimer,
+// checked 2026-11-04): non-commercial reproduction allowed, unmodified, with the Government of Alberta
+// named as the source and not presented as an official version. Changes monthly, so cached 6 hours
+// (10 minutes after a failure, keeping the last good value).
+let wcsCache: { at: number; ok: boolean; data: unknown } | null = null;
+async function wcs(now: number) {
+  if (wcsCache && now - wcsCache.at < (wcsCache.ok ? 6 * 3600000 : 600000)) return wcsCache.data;
+  try {
+    const res = await fetch("https://api.economicdata.alberta.ca/data?table=OilPrices&Type=WCS;WTI");
+    if (!res.ok) throw new Error(`Alberta: HTTP ${res.status}`);
+    const rows: Record<string, unknown>[] = await res.json();
+    const by: Record<string, { wcs?: number; wti?: number }> = {};
+    for (const r of rows) {
+      const type = String(r["Type"] ?? r["Type "] ?? "").trim(), month = String(r["Date"] ?? "").slice(0, 7), v = Number(r["Value"]);
+      if (!/^\d{4}-\d{2}$/.test(month) || !isFinite(v) || (type !== "WCS" && type !== "WTI")) continue;
+      (by[month] ??= {})[type === "WCS" ? "wcs" : "wti"] = v;
+    }
+    const month = Object.keys(by).filter((m) => by[m].wcs != null && by[m].wti != null).sort().pop();
+    if (!month) throw new Error("Alberta: no month with both WCS and WTI");
+    const data = { month, wcs: by[month].wcs, wti: by[month].wti, unit: "US$/bbl", source: "Government of Alberta, Economic Dashboard" };
+    wcsCache = { at: now, ok: true, data };
+    return data;
+  } catch (e) {
+    // Keep showing the last good month if there is one; retry in 10 minutes.
+    const last = wcsCache && !(wcsCache.data as { error?: string }).error ? wcsCache.data : null;
+    const data = last ?? { error: String((e as Error).message ?? e) };
+    wcsCache = { at: now, ok: false, data };
+    return data;
+  }
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -212,26 +308,27 @@ Deno.serve(async (req) => {
       return get(contract).then((f) => ({ ...f, contract, fallback: false }))
         .catch(() => get(`${root}=F`).then((f) => ({ ...f, contract, fallback: true })));
     };
-    const [pairs, drivers, bond] = await Promise.all([
+    const ctxP = context(now).catch((e) => ({ error: String((e as Error).message ?? e) }));
+    const [pairs, drivers, bond, ctx, wcsData] = await Promise.all([
       Promise.all(PAIRS.map(async (p) => {
         const target = targetDate(p.cal, now);
         const [idx, fut, open931] = await Promise.all([get(p.index), future(p.future, target), at931(p.index, p.cal, now)]);
         const refs = await futureRefs(p.cal, idx.bars, fut.symbol, fut.bars, now, five).catch(() => ({}));
         return { key: p.key, name: p.name, target, index: { ...idx, at931: open931 }, future: { ...fut, refs } };
       })),
-      Promise.all(DRIVERS.map(async (d) => {
-        try {
-          const c = await get(d.symbol);
-          const prev = c.bars.length > 1 ? c.bars[c.bars.length - 2].close : null;
-          const changePercent = prev ? ((c.price - prev) / prev) * 100 : c.changePercent;
-          return { key: d.key, name: d.name, symbol: d.symbol, label: c.label, price: c.price, time: c.time, changePercent };
-        } catch (e) {
-          return { key: d.key, name: d.name, symbol: d.symbol, error: String((e as Error).message ?? e) };
-        }
+      // Change since the last US close (0 if it hasn't traded since), from the batched context data.
+      ctxP.then((c) => DRIVERS.map((d) => {
+        // deno-lint-ignore no-explicit-any
+        const x = (c as any)?.items?.find((i: any) => i.symbol === d.symbol);
+        if (!x || x.error || x.price == null) return { key: d.key, name: d.name, symbol: d.symbol, error: x?.error ?? (c as any)?.error ?? "no data" };
+        const changePercent = x.traded && x.ref ? ((x.price - x.ref) / x.ref) * 100 : 0;
+        return { key: d.key, name: d.name, symbol: d.symbol, price: x.price, time: x.time, changePercent };
       })),
       canada10y().catch((e) => ({ error: String((e as Error).message ?? e) })),
+      ctxP,
+      wcs(now),
     ]);
-    return new Response(JSON.stringify({ fetchedAt: now, source: "Yahoo Finance; Bank of Canada", pairs, drivers, canada10y: bond }), {
+    return new Response(JSON.stringify({ fetchedAt: now, source: "Yahoo Finance; Bank of Canada; Government of Alberta", pairs, drivers, canada10y: bond, context: ctx, wcs: wcsData }), {
       headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "public, max-age=30", "X-Robots-Tag": "noindex, nofollow" },
     });
   } catch (e) {

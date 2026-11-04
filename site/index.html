@@ -7,11 +7,12 @@
 <meta name="robots" content="noindex, nofollow, noarchive">
 <meta name="googlebot" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
-<meta name="description" content="Where the S&amp;P 500, Nasdaq-100 and Dow are likely to open, estimated live from overnight futures.">
+<meta name="description" content="Where the S&amp;P 500, Nasdaq-100, Dow and Russell 2000 are likely to open, estimated live from overnight futures.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600&display=swap">
 <style>
-/* Layout: headline summary band, three index panels that stack on phones, then a short "how to read this" note. */
+/* Layout: headline summary band, five US index cards (3 + 2 on wide screens, 2-1-2 on tablets, stacked on phones),
+   a compact overnight-context strip, the Canada section, then a short "how to read this" note. */
 :root {
   --bg: #f3f5f7; --panel: #ffffff; --ink: #14202b; --muted: #5b6875; --line: #d9dfe5;
   --accent: #1f5f8b; --up: #1d7a4f; --up-bg: #e3f3ea; --down: #b2362b; --down-bg: #f9e5e2;
@@ -44,7 +45,18 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .note { padding: 10px 14px; border-radius: 8px; background: var(--flat-bg); font-size: 0.9rem; }
 .note.warn { background: var(--warn-bg); color: var(--warn-ink); }
 .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
-@media (min-width: 560px) { .grid { grid-template-columns: repeat(2, 1fr); } #cards { grid-auto-flow: column; grid-template-rows: repeat(2, auto); } }
+@media (min-width: 560px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 560px) and (max-width: 899px) { #cards > .card:nth-child(3) { grid-column: 1 / -1; } }
+@media (min-width: 900px) { #cards { grid-template-columns: repeat(6, 1fr); } #cards > .card { grid-column: span 2; } #cards > .card:nth-child(n+4) { grid-column: span 3; } }
+.ctx { display: grid; gap: 10px; }
+.ctx-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 560px) { .ctx-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .ctx-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.ctx-grid li { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 3px; align-content: start; min-width: 0; }
+.ctx-grid .cname { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.ctx-grid .cval { font: 500 1.1rem var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ctx-grid .cchg { font: 500 0.85rem var(--mono); font-variant-numeric: tabular-nums; }
+.ctx-grid .cnote { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
 .big { overflow-wrap: anywhere; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
 .card h3 { margin: 0; font-size: 1rem; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
@@ -77,7 +89,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
   <header>
     <div>
       <h1>Implied Open</h1>
-      <p class="sub">Where the S&amp;P 500, Nasdaq, Dow and Toronto's TSX are likely to open at 9:30 a.m. Eastern, worked out live from overnight futures trading.</p>
+      <p class="sub">Where the S&amp;P 500, Nasdaq, Dow, Russell 2000 and Toronto's TSX are likely to open at 9:30 a.m. Eastern, worked out live from overnight futures trading.</p>
     </div>
     <button id="refresh" type="button">Refresh</button>
   </header>
@@ -92,6 +104,11 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
 
   <div class="grid" id="cards"></div>
 
+  <section class="ctx" aria-label="Overnight context">
+    <div class="section-h"><h2>Overnight context</h2><p id="ctx-sub">Change since the last US close. Background only: none of this feeds into the estimates.</p></div>
+    <ul class="ctx-grid" id="ctx"></ul>
+  </section>
+
   <div class="section-h"><h2>Canada</h2><p>The TSX opens at 9:30 a.m. Eastern too.</p></div>
   <section class="summary" aria-live="polite">
     <h2 id="ca-headline">Loading Canadian prices…</h2>
@@ -100,20 +117,21 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
   <div class="grid">
     <div id="ca-cards" style="display:grid;min-width:0"></div>
     <article class="card">
-      <h3>What's moving Canada overnight<span>vs last close</span></h3>
+      <h3>What's moving Canada overnight<span>since US close</span></h3>
       <ul class="drivers" id="drivers"></ul>
     </article>
   </div>
 
   <section class="method">
     <h3>How to read this</h3>
-    <p><strong>What "implied open" means.</strong> The stock market is closed overnight, but futures on the S&amp;P 500, Nasdaq-100 and Dow trade almost around the clock. However far a futures contract has moved since the market closed at 4 p.m. Eastern, the index is expected to open roughly that far up or down. Implied open = last close + that futures move.</p>
+    <p><strong>What "implied open" means.</strong> The stock market is closed overnight, but futures on the S&amp;P 500, Nasdaq-100, Dow and Russell 2000 trade almost around the clock. However far a futures contract has moved since the market closed at 4 p.m. Eastern, the index is expected to open roughly that far up or down. Implied open = last close + that futures move.</p>
     <p><strong>It gets more accurate closer to the open.</strong> Overnight trading is light, so prices drift and can swing on little news. More traders join from about 8 a.m. Eastern, and economic reports often come out at 8:30 a.m. An estimate taken a few minutes before 9:30 is usually much closer to the real open than one taken the night before.</p>
     <p><strong>After the open.</strong> From 9:30 each card shows where the index actually opened: its level at 9:31, after the first full minute of trading. The very first printed level often lags the real move, because at 9:30:00 many stocks haven't traded yet and the index still counts them at yesterday's prices. For a minute or so after 9:30, while that first minute plays out, the card keeps showing the last estimate.</p>
     <p><strong>Holidays and early closes.</strong> The page knows the US and Canadian market holidays and 1 p.m. early closes through 2027, so on a holiday or the evening before one it estimates the next real open, and the TSX card follows Canada's calendar. After a 1 p.m. close, "futures at that close" is the futures price at 1 p.m., when stocks stopped trading (futures carry on until 1:15).</p>
-    <p><strong>Limits.</strong> It's an estimate, not a forecast or advice. Prices come from Yahoo Finance's free feed, where futures prices run about 10 minutes behind and which isn't officially supported. Futures used: E-mini S&amp;P 500 (ES), E-mini Nasdaq-100 (NQ), Mini Dow (YM). The Nasdaq Composite has no futures of its own, so it borrows the NQ percentage move. The page refreshes itself every minute.</p>
+    <p><strong>Limits.</strong> It's an estimate, not a forecast or advice. Prices come from Yahoo Finance's free feed, where futures prices run about 10 minutes behind and which isn't officially supported. Futures used: E-mini S&amp;P 500 (ES), E-mini Nasdaq-100 (NQ), Mini Dow (YM), E-mini Russell 2000 (RTY). The Nasdaq Composite has no futures of its own, so it borrows the NQ percentage move. The page refreshes itself every minute.</p>
+    <p><strong>Overnight context.</strong> The strip under the index cards shows what else has moved since the last US close (4 p.m. Eastern, or 1 p.m. on an early-close day): the VIX (how big a swing traders expect in the S&amp;P 500 over the next month; it's calculated from about 3:15 a.m. Eastern), the US 10-year Treasury yield, the US dollar against major currencies, European stocks, Brent crude and copper. It helps explain why futures moved, but none of it is used in the estimates. The 10-year yield on Yahoo only updates from about 8:20 a.m. Eastern; before that the tile shows the yield at the close and which way 10-year Treasury futures have moved since (futures up means yields down). Europe's stock markets trade from about 3 a.m. to 11:30 a.m. Eastern, so their change is from their own previous close. Source: Yahoo Finance.</p>
     <p><strong>Track record.</strong> <a href="/accuracy">See how close past estimates came to the real open</a>, by index and by how early the estimate was taken.</p>
-    <p><strong>Canada.</strong> Canadian index futures (TSX 60, traded on the Montreal Exchange) have no free public feed, so the TSX estimate borrows the S&amp;P 500 futures move. That makes it the roughest number on the page. The TSX usually moves in the same direction as the S&amp;P, but it leans much more on banks, energy and mining, so check the drivers. Oil, natural gas, gold and the Canadian dollar come from Yahoo Finance. The Government of Canada 10-year bond yield comes from the Bank of Canada and is updated once a day, so it shows the latest published close, not an overnight move.</p>
+    <p><strong>Canada.</strong> Canadian index futures (TSX 60, traded on the Montreal Exchange) have no free public feed, so the TSX estimate borrows the S&amp;P 500 futures move. That makes it the roughest number on the page. The TSX usually moves in the same direction as the S&amp;P, but it leans much more on banks, energy and mining, so check the drivers. Oil, natural gas, gold and the Canadian dollar come from Yahoo Finance; like the overnight context strip, their change is measured since the last US close. The Government of Canada 10-year bond yield comes from the Bank of Canada and is updated once a day, so it shows the latest published close, not an overnight move. Western Canadian Select (WCS), Alberta's heavy oil, has no free live price: the figure shown is the monthly average published by the Government of Alberta (Economic Dashboard), about a month behind, with WTI's average for the same month. It's background for Alberta readers, not an official version of the Government of Alberta's figures, and not a guide to the open.</p>
   </section>
 </div>
 
@@ -121,9 +139,11 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
 (function () {
   const RELAY = "https://awagbieeouxxhytdhloi.supabase.co/functions/v1/implied-open";
   const META = {
-    // Card order: on phones top to bottom; on wider screens left column (S&P, Dow), then right (Nasdaq-100, Composite).
+    // Card order (Matt, 2026-11-04): S&P, Dow, Russell 2000, then the two Nasdaqs together. Wide screens: those three across
+    // the top, Nasdaq-100 and Composite below; tablets: S&P | Dow, Russell full width, Nasdaq-100 | Composite; phones: top to bottom.
     spx: { short: "S&P 500", fut: "ES", desc: "the 500 largest US companies" },
     dji: { short: "Dow", fut: "YM", desc: "30 large blue-chip companies" },
+    rut: { short: "Russell 2000", fut: "RTY", desc: "2,000 smaller US companies" },
     ndx: { short: "Nasdaq-100", fut: "NQ", desc: "large tech-heavy Nasdaq companies" },
     ixic: { short: "Nasdaq Composite", fut: "NQ", proxy: true, desc: "nearly every Nasdaq-listed stock",
       note: (p) => `No futures trade on the Composite, so this applies the Nasdaq-100 futures move (${p}) as a stand-in. The two indexes usually move together, but the Composite also holds thousands of smaller companies, so treat this as rougher than the others.` },
@@ -346,8 +366,8 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     const ndx = core.find((r) => r.k === "ndx"), dji = core.find((r) => r.k === "dji");
     if (!marketOpen && n3 >= 2) {
       const weakest = sorted[0], strongest = sorted[sorted.length - 1];
-      if (downs.length === n3) ex += `Of the three with their own futures, the ${weakest.m.short} is set to fall the most and the ${strongest.m.short} the least. `;
-      else if (ups.length === n3) ex += `Of the three with their own futures, the ${strongest.m.short} is set to gain the most and the ${weakest.m.short} the least. `;
+      if (downs.length === n3) ex += `Of the ${n3 === 4 ? "four" : n3} with their own futures, the ${weakest.m.short} is set to fall the most and the ${strongest.m.short} the least. `;
+      else if (ups.length === n3) ex += `Of the ${n3 === 4 ? "four" : n3} with their own futures, the ${strongest.m.short} is set to gain the most and the ${weakest.m.short} the least. `;
       ex += `Overall this is ${sizeWord(big)}.`;
       if (ndx && dji && Math.abs(ndx.pct) > Math.abs(dji.pct) * 1.5 && big >= 0.3)
         ex += ` The Nasdaq-100 moving most usually means technology stocks are leading the move.`;
@@ -383,8 +403,73 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     else if (mins != null) { t.className = "note warn"; t.textContent = `${calNote}The market opens in ${Math.floor(mins / 60)} h ${mins % 60} min. Estimates this early often change. They become more reliable after about 8 a.m. Eastern, and most reliable in the last few minutes before 9:30.`; }
     else { t.className = "note warn"; t.textContent = `${calNote}${nextTxt} Overnight estimates often change, so check again closer to the open.`; }
 
-    $("meta").innerHTML = `<span>Futures prices as of ${etLabel(newestFut)} (about 10 minutes delayed)</span><span>Updated ${etLabel(now)}</span><span>Sources: Yahoo Finance, Bank of Canada</span>`;
+    $("meta").innerHTML = `<span>Futures prices as of ${etLabel(newestFut)} (about 10 minutes delayed)</span><span>Updated ${etLabel(now)}</span><span>Sources: Yahoo Finance, Bank of Canada, Government of Alberta</span>`;
+    renderContext(j);
     renderCanada(j, results.find((r) => r.k === "tsx"));
+  }
+
+  // Overnight context strip: background only, not used in any estimate. The relay sends each price with
+  // its value at the last US close (ref), whether it has traded since (traded) and whether it's paused (stale).
+  function renderContext(j) {
+    const c = j.context;
+    if (!c || c.error || !c.items) { $("ctx").innerHTML = `<li><span class="cname">Overnight context</span><span class="cnote">These prices couldn't be loaded right now. The page tries again every minute.</span></li>`; return; }
+    const d = {}; c.items.forEach((x) => (d[x.key] = x));
+    const ok = (x) => x && !x.error && isFinite(x.price);
+    const moved = (x) => ok(x) && x.traded && isFinite(x.ref);
+    const pctOf = (x) => ((x.price - x.ref) / x.ref) * 100;
+    const pctTxt = (p) => `${sign(p)}${fmt(Math.abs(p), 2)}%`;
+    $("ctx-sub").textContent = `Change since the US close (${closeLabel("us", c.usClose.date)} ET ${dateLabel(c.usClose.date)}). Background only: none of this feeds into the estimates.`;
+    const tile = (name, val, chg, note) => `<li><span class="cname">${name}</span><span class="cval">${val}</span><span class="cchg">${chg}</span><span class="cnote">${note}</span></li>`;
+    const na = (name) => tile(name, "—", "", "Couldn't be loaded.");
+    const out = [];
+
+    // VIX: moves in points. Not calculated overnight (from about 3:15 a.m. ET).
+    const v = d.vix;
+    if (!ok(v)) out.push(na("Volatility (VIX)"));
+    else if (!moved(v)) out.push(tile("Volatility (VIX)", fmt(v.price), "no update yet", "The S&amp;P 500's expected swings. Calculated from about 3:15 a.m. ET."));
+    else {
+      const pts = v.price - v.ref;
+      out.push(tile("Volatility (VIX)", fmt(v.price), `${sign(pts)}${fmt(Math.abs(pts), 2)} pts`, v.stale ? "Not updating now (calculated about 3:15 a.m. to 4:15 p.m. ET)."
+        : Math.abs(pts) < 0.3 ? "The S&amp;P 500's expected swings: little changed." : pts > 0 ? "Expected swings up: traders are more nervous." : "Expected swings down: traders are calmer."));
+    }
+
+    // US 10-year: the yield when Yahoo has a fresh one (about 8:20 a.m. to the afternoon), otherwise
+    // the yield at the close plus which way 10-year T-note futures have moved (price up = yield down).
+    const t = d.tnx, z = d.zn;
+    // Any yield print since the US close counts (Yahoo's yield stops updating mid-afternoon; keep showing the day's change).
+    if (moved(t)) {
+      const bp = Math.round((t.price - t.ref) * 100);
+      out.push(tile("US 10-year yield", fmt(t.price) + "%", `${bp > 0 ? "+" : bp < 0 ? "−" : ""}${Math.abs(bp)} bp`, bp === 0 ? "Unchanged. (1 bp = 0.01 percentage points.)" : bp > 0 ? "Higher yields tend to weigh on stocks, small companies most." : "Lower yields tend to help stocks, small companies most."));
+    } else if (ok(t) && moved(z)) {
+      const zp = pctOf(z), dir = Math.abs(zp) < 0.03 ? "flat" : zp > 0 ? "down" : "up";
+      out.push(tile("US 10-year yield", fmt(t.price) + "%", `futures ${pctTxt(zp)}`, `Yield at the close. Since then 10-year Treasury futures are ${dir === "flat" ? "about unchanged, so yields are too" : (zp > 0 ? "up" : "down") + ", which means yields are " + (dir === "down" ? "lower" : "higher")}. Live yield from about 8:20 a.m.`));
+    } else out.push(ok(t) ? tile("US 10-year yield", fmt(t.price) + "%", "", "Yield at the close.") : na("US 10-year yield"));
+
+    // US dollar index.
+    const x = d.dxy;
+    out.push(!ok(x) ? na("US dollar") : tile("US dollar", fmt(x.price), moved(x) ? pctTxt(pctOf(x)) : "no change yet", "Against six major currencies (euro, yen, pound and others)."));
+
+    // Europe: Euro Stoxx 50, with the DAX and FTSE in the note.
+    const e = d.stoxx;
+    if (!ok(e)) out.push(na("Europe (Euro Stoxx 50)"));
+    else if (!moved(e)) out.push(tile("Europe (Euro Stoxx 50)", "Closed", "", "No trading since the US close. Europe opens about 3 a.m. ET."));
+    else {
+      const more = ["dax", "ftse"].filter((k) => moved(d[k])).map((k) => `${k === "dax" ? "Germany (DAX)" : "UK (FTSE)"} ${pctTxt(pctOf(d[k]))}`).join(" · ");
+      out.push(tile("Europe (Euro Stoxx 50)", fmt(e.price, 0), pctTxt(pctOf(e)) + (e.stale ? " (closed)" : ""), (more ? more + ". " : "") + "Change from Europe's own previous close."));
+    }
+
+    // Brent crude, with the Brent-WTI spread (front-month futures).
+    const b = d.brent, w = d.wti;
+    if (!ok(b)) out.push(na("Brent crude"));
+    else {
+      const sp = ok(w) ? b.price - w.price : null;
+      out.push(tile("Brent crude", "US$" + fmt(b.price), moved(b) ? pctTxt(pctOf(b)) : "no change yet", sp == null ? "The world oil benchmark." : `World oil benchmark, US$${fmt(Math.abs(sp))} ${sp >= 0 ? "above" : "below"} WTI.`));
+    }
+
+    // Copper: the industrial-demand marker.
+    const cu = d.copper;
+    out.push(!ok(cu) ? na("Copper") : tile("Copper", "US$" + fmt(cu.price, 3) + "/lb", moved(cu) ? pctTxt(pctOf(cu)) : "no change yet", "The industrial marker: tracks factory and building demand; matters for miners."));
+    $("ctx").innerHTML = out.join("");
   }
 
   function renderCanada(j, tsx) {
@@ -404,6 +489,14 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
       const cls = Math.abs(p) < TH[k] ? "" : p > 0 ? " up" : " down";
       return `<li><span class="dname">${x.name}</span><span class="dval">${price[k](x.price)} <span class="pill${cls}">${sign(p)}${fmt(Math.abs(p), 2)}%</span></span><span class="dwhy">${why[k](p)}</span></li>`;
     });
+    // Western Canadian Select: monthly average from the Government of Alberta, about a month behind.
+    const w = j.wcs;
+    if (w && !w.error && isFinite(w.wcs) && isFinite(w.wti)) {
+      const gap = w.wti - w.wcs, mon = new Date(w.month + "-15T12:00:00Z").toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+      items.splice(1, 0, `<li><span class="dname">WCS heavy oil (${mon} avg)</span><span class="dval">US$${fmt(w.wcs, 2)} <span class="pill">${gap >= 0 ? "−" : "+"}$${fmt(Math.abs(gap), 2)} vs WTI</span></span><span class="dwhy">Western Canadian Select, Alberta's heavy oil, sold at US$${fmt(Math.abs(gap), 2)} ${gap >= 0 ? "under" : "over"} WTI. Monthly average from the Government of Alberta, about a month behind; WTI averaged US$${fmt(w.wti, 2)} that month. Background for Alberta, not a guide to the open: WTI's overnight move is what drives energy stocks at 9:30.</span></li>`);
+    } else {
+      items.splice(1, 0, `<li><span class="dname">Western Canadian Select</span><span class="dval">unavailable</span><span class="dwhy">The Government of Alberta data couldn't be loaded.</span></li>`);
+    }
     const b = j.canada10y;
     if (b && !b.error && isFinite(b.value) && isFinite(b.prev)) {
       const bp = Math.round((b.value - b.prev) * 100);
