@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-04 (MX session: private SXF site built and deployed from branch `claude/mx-private`, awaiting Matt's approval)_
+_Last updated: 2026-11-04 (MX session: private SXF site approved by Matt and merged)_
 
 ## Status
 - The data relay is deployed and working: Supabase project "Menage", Edge Function `implied-open`, version 4 (adds the Canada data). It covers four US indexes plus the TSX, including the Nasdaq Composite (it uses NQ futures as a stand-in).
@@ -8,16 +8,15 @@ _Last updated: 2026-11-04 (MX session: private SXF site built and deployed from 
 - Site merged into main (PR #2), Canada section merged (PR #4).
 - **Live at https://implied-open.soesraider.com** (hosted 2026-11-04). See "Hosting and deploys" below.
 - The old private Claude artifact version was deleted at Matt's request.
-- **Private SXF version (built 2026-11-04, NOT yet merged):** https://implied-open-pvt.soesraider.com, login required. See "Private SXF site" below.
+- **Private SXF version (live 2026-11-04, approved by Matt):** https://implied-open-pvt.soesraider.com, login required. Matt logged in on his phone and confirmed live SXF numbers (so m-x.ca answers Cloudflare's servers). See "Private SXF site" below.
 
 ## Private SXF site
 - **What:** the public page plus a TSX estimate from Montreal Exchange SXF futures (main number) with the S&P 500 stand-in kept as a comparison. Only Matt can reach it.
 - **Code:** `private/` in this repo. `private/build.mjs` copies `site/` and injects `private/sxf.js` (fails the build if the public page's hook points change). `private/functions/_middleware.js` checks the Access login token on every request and fails closed. `private/functions/api/sxf.js` fetches and parses the MX quote page (front month = most open interest; bid/ask midpoint when tight, else last trade).
-- **Cloudflare:** Pages project `implied-open-pvt` (root dir `private`, build `node build.mjs`, output `dist`, previews OFF). Production branch is temporarily `claude/mx-private` for testing; **switch it to `main` when Matt approves and the PR merges.** Env vars: `ACCESS_TEAM_DOMAIN=small-credit-1e44.cloudflareaccess.com`, `ACCESS_AUD` (the Access app's AUD tag), `ALLOWED_EMAIL=menageyyc@gmail.com`.
+- **Cloudflare:** Pages project `implied-open-pvt` (root dir `private`, build `node build.mjs`, output `dist`, previews OFF). Production branch `main` (was `claude/mx-private` during testing). Every merge to main redeploys both sites. Env vars: `ACCESS_TEAM_DOMAIN=small-credit-1e44.cloudflareaccess.com`, `ACCESS_AUD` (the Access app's AUD tag), `ALLOWED_EMAIL=menageyyc@gmail.com`.
 - **DNS:** one new record in soesraider.com: `CNAME implied-open-pvt → implied-open-pvt.pages.dev`, proxied. Nothing else touched.
 - **Access (Zero Trust, Free plan, team `small-credit-1e44`, set up by Matt 2026-11-04):** login method One-time PIN (email code). App "Implied Open (private)" covers `implied-open-pvt.soesraider.com`, `implied-open-pvt.pages.dev` and `*.implied-open-pvt.pages.dev`; policy "Matt only" allows menageyyc@gmail.com; session 720h (one month, the maximum).
-- **Checks done:** 15 unit tests of the login gate (valid token for Matt passes; no settings, no token, forged, expired, wrong audience/issuer/email, tampered, alg none all get 403). Logged-out requests to the page, `/api/sxf` and `/sxf.js` on both main addresses redirect to the Cloudflare login. The public project's preview of this branch serves only the public page (no private code). Local run against live data: no page errors, no sideways scroll on phone.
-- **Untested until Matt logs in:** whether m-x.ca answers requests from Cloudflare's servers (it answered from this session).
+- **Checks done:** 15 unit tests of the login gate (valid token for Matt passes; no settings, no token, forged, expired, wrong audience/issuer/email, tampered, alg none all get 403). Logged-out requests to the page, `/api/sxf` and `/sxf.js` on both main addresses redirect to the Cloudflare login. The public project's preview of this branch serves only the public page (no private code). Local run against live data: no page errors, no sideways scroll on phone. Live check by Matt after login, 2026-11-04 ~3:48 a.m. ET: SXF +0.43% vs S&P 500 stand-in −0.14% (gold +2.4%).
 - **Open issue to watch:** the settlement shown on m-x.ca is assumed to be the previous session's from the start of the 8 p.m. ET session. The page hides the SXF estimate 4–8 p.m. ET weekdays to avoid mixing days. Check this assumption one evening.
 - **If the Bourse says no:** delete the Pages project `implied-open-pvt`, the Access app, and the DNS record, and remove `private/`.
 
