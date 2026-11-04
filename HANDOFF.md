@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-04 (11 scheduled checks set up, see "Scheduled checks"; trader explainer and extra-data research added in notes/. Earlier the same day: 9:31 open + holidays LIVE, relay v6, logger v4, PR #20 merged)_
+_Last updated: 2026-11-04 (Matt's extra-data decisions recorded as a build brief for the next session; TMX email sent. Earlier: 11 scheduled checks set up, see "Scheduled checks"; trader explainer and extra-data research added in notes/. Earlier the same day: 9:31 open + holidays LIVE, relay v6, logger v4, PR #20 merged)_
 
 ## Start here (fresh session)
 - **9:31 open + holidays: LIVE since 2026-11-04** (Matt approved; relay `implied-open` v6 and logger `implied-open-accuracy` v4 deployed with `verify_jwt: false`, PR #20 merged). Matt said: leave the first printed open off the page. First real tests: Thu Nov 5 9:30-9:32 (opening state then 9:31 level), Nov 25-27 (Thanksgiving and the 1 p.m. close), Dec 24-29. See "Built: 9:31 open and holidays" and open item 0a. If a question needs deep judgment (method soundness, data reliability, security, legal exposure), say so and suggest raising the effort first.
@@ -12,13 +12,21 @@ _Last updated: 2026-11-04 (11 scheduled checks set up, see "Scheduled checks"; t
 - **Open items:**
   0. **Done 2026-11-04:** the three changes in "Build brief: 9:31 open and holidays" (approved, deployed, merged).
   0a. **Calendar checks (after deploy):** Wed Nov 25 evening: US cards say "next open Fri Nov 27", TSX says Thu Nov 26. Fri Nov 27 after 1 p.m.: cards say "Futures at that close (1:00 PM ET)"; check that the 1 p.m. price matches Yahoo's 5-minute ESZ26.CME bar ending 1:00 p.m. (first chance to confirm the early-close rule with 5-minute data). Fri Nov 27 morning: TSX card's futures line says "last price before that close". Dec 24, 28, 29 similarly. (All of these, Dec 29 excepted, are scheduled to run themselves: see "Scheduled checks".) **Extend the holiday lists to 2028 by Nov 2027** (three copies: `site/index.html`, both functions).
-  1. **Matt to send the permission email** to TMX Datalinx (marketdata@tmx.com), text in `notes/mx-permission-email.md` (already worded for a page that is live). Matt sends it himself; never send email on his behalf. If the Bourse says no, take the MX feed down (see "If the Bourse says no" below).
+  1. **Permission email to TMX Datalinx: SENT by Matt on 2026-11-04** (text in `notes/mx-permission-email.md`). Waiting for their reply; Matt will pass it on. Never send email on his behalf. If the Bourse says no, take the MX feed down (see "If the Bourse says no" below).
   2. **Evening check:** one weekday after 8 p.m. ET, confirm the private page's SXF number looks sensible (that m-x.ca's settlement has rolled to that day's). If it hasn't, widen the paused window in `private/sxf.js`. Scheduled for Thu Nov 5, 8:07 p.m. ET.
   3. Optional, offered to Matt: "Sign in with Google" instead of the emailed code (needs a Google Cloud OAuth client, ~15 min with Matt). Optional: rename the Zero Trust team `small-credit-1e44`.
-  4. **Extra data (asked 2026-11-04, nothing built):** options researched in `notes/dashboard-ideas.md` (Russell 2000 implied open, VIX, rates, dollar, Europe, Brent, copper; Alberta WCS/WTI and gas from the Government of Alberta's free monthly API; no reliable free daily/live WCS exists). Waiting for Matt to pick. Any of it is a website change: screenshots + approval first.
+  4. **NEXT SESSION: build the extra data (Matt decided 2026-11-04).** See "Build brief: extra data" below. Research in `notes/dashboard-ideas.md`.
 - **Scheduled checks (set up 2026-11-04):** 11 one-off checks run themselves at the right times; see "Scheduled checks" below. Each records its result here.
 - **Explainer for friends/traders:** `notes/market-explainer.md` (one paragraph, numbers verified).
 - **Hard rules:** MX data must never be reachable without logging in (page, `/api/sxf`, any preview or deployment link). Never put the MX fetch in the public Supabase function or in `site/`. Never create a top-level `functions/` folder (the public Pages project would serve it).
+
+## Build brief: extra data (Matt's decisions 2026-11-04)
+All on the **main page** (not a separate page). Website + function change: screenshots, Cloudflare preview and Matt's approval before merging or deploying.
+1. **Russell 2000 as a 5th implied open.** Same method as the S&P: ^RUT close + move in the E-mini Russell 2000 quarterly contract (RTYZ26.CME tested live 2026-11-04; check the H27 etc. symbols and that its expiry/switch dates match ES; fallback RTY=F). Add it to the relay's fixed symbol list, the logger (snapshots, actuals incl. 9:31 and 9:35, backfill), `implied_open.summary()` if it lists indexes, `site/accuracy.html`, and a card on the page. Rethink the card grid (5 US cards + TSX) for desktop and phone and show Matt. Keep `verify_jwt: false`; run `cd private && node build.mjs`.
+2. **Overnight context row (Matt: "more valuable" than WCS).** VIX (^VIX; computed from ~3:15 a.m. ET), US 10-year (^TNX yield only from ~8:20 a.m. ET; overnight use 10-yr T-note futures ZN=F, price moves opposite to yield: pick a clear display, e.g. yield change in basis points when available), US dollar index (DX-Y.NYB), Europe (^STOXX50E; maybe DAX/FTSE), Brent (BZ=F, show the Brent-WTI spread too), copper (HG=F, labelled as the industrial marker). Change since the previous US close, plain-language labels, compact. All tested on Yahoo 2026-11-04.
+3. **WCS as context in the Canada box, one month behind is fine.** Government of Alberta API, `https://api.economicdata.alberta.ca/data?table=OilPrices&Type=WCS;WTI` (monthly, no key; latest on 2026-11-04 was Sep 2026: WCS $80.37, WTI $97.31, discount $16.94). Show e.g. "WCS (Sep avg) $80.37, $16.94 under WTI". It changes monthly, so cache it (don't fetch it on every page refresh). Check the API's terms of use first. Alberta gas was not requested.
+4. Each added symbol is another Yahoo request per relay call (each open tab calls once a minute): batch or cache sensibly and recheck the free-tier numbers.
+5. Matt approved the models for the scheduled checks (Sonnet routine, Opus for Dec 2, Dec 14, Feb 16, Nov 2027). The Mon Mar 15, 2027 contract-switch check stays unscheduled: the Feb 16 review asks him.
 
 ## Scheduled checks (set up 2026-11-04)
 Each check has its own session (repo attached, so it can read these notes and merge a notes-only PR), created idle on 2026-11-04 and woken by a one-off scheduled task. Each one checks, reports to Matt (summary in the session plus a phone notification), and adds a dated result line to this file. None may change the site, functions or database; a problem gets diagnosed and a fix proposed to Matt. Times are ET.
@@ -146,6 +154,7 @@ Each check has its own session (repo attached, so it can read these notes and me
 - Yahoo Finance's chart feed is unofficial. If it breaks, the function needs updating.
 - Futures prices are about 10 minutes delayed.
 - Market holidays: handled by fixed lists through 2027. Extend before 2028.
+- Alberta stays on UTC-6 year-round from Nov 1, 2026 ("Alberta Time"). Everything in this project runs on New York time, so it's unaffected, but times Matt sees elsewhere (e.g. usage-limit resets) may be shown an hour early if a system still assumes Alberta is UTC-7.
 - The Composite estimate is a proxy.
 
 ## Hosting and deploys
