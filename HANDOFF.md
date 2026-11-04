@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-04 (hosting session, end)_
+_Last updated: 2026-11-04 (MX session: data check done, waiting on Matt)_
 
 ## Status
 - The data relay is deployed and working: Supabase project "Menage", Edge Function `implied-open`, version 4 (adds the Canada data). It covers four US indexes plus the TSX, including the Nasdaq Composite (it uses NQ futures as a stand-in).
@@ -42,6 +42,18 @@ What Matt was told, and accepted: the MX terms need the Bourse's prior authoriza
 4. Check the data before designing around it: fetch the m-x.ca SXF quote page server-side and see whether it works without a browser (bot protection, cookies), how delayed the quotes are (MX public quotes are usually delayed), and which contract month is the front month (SXF is quarterly: Mar/Jun/Sep/Dec, so rolls need handling). Read the page's HTML in full; don't assume its structure.
 5. Method to propose: SXF vs. its value at the last S&P/TSX 60 close gives an implied % move for the TSX 60, applied to the S&P/TSX Composite as a proxy (say so on the page, like the Nasdaq Composite note). Compare it with the current S&P 500-futures-based TSX estimate and decide with Matt whether to show both.
 6. Cloudflare Zero Trust (needed for Access) may need a one-time setup in Matt's browser (team name, Free plan, possibly a payment method even on Free). Verify the current requirements in the Cloudflare docs before telling Matt what to click.
+
+### Data check done 2026-11-04 (MX session, ~2:20 a.m. ET)
+- **Fetchable server-side:** `https://www.m-x.ca/en/trading/data/quotes?symbol=SXF` returned HTTP 200 to a plain curl request (no bot challenge, no cookies needed). Served by Apache behind Amazon CloudFront, `cache-control: no-store`. Not yet tested from Cloudflare's servers; test that first when building.
+- **Structure:** each contract is a table row (`<tr id="SXFZ26" data-row='{...}'>`) whose `data-row` attribute holds HTML-escaped JSON with `symbol`, `expiry_date`, `last_price`, `bid_price`, `ask_price`, `settlement_price`, `net_change`, `open_interest`, `volume`, `open/high/low_price`, `nb_trades`. Parse that JSON, not the visible cells.
+- **Delay:** the page says "Last update: November 4, 2026 at 2:20 a.m. (Real-time)" and the time advanced to 2:21 a.m. on a refetch 20 seconds later. So it's effectively real time, better than Yahoo's ~10-minute delay.
+- **Front month:** December 2026 (`SXFZ26`, expires 2026-12-18) had all the open interest (147,951) and volume (354). Every other month (Mar/Jun/Sep 2027, Dec 2027–2030) showed zero bid/ask/volume. Rule to use: pick the contract with the highest open interest; that handles quarterly rolls automatically.
+- **Sample at 2:20 a.m.:** last 2,120.6, bid 2,120.3, ask 2,120.8, settlement 2,113.2, net change +7.4 (+0.35%).
+- **Trading hours:** SXF already had 346 trades by 2:20 a.m., consistent with MX's 2021 extended hours (sessions start 8:00 p.m. ET the previous evening, close 4:30 p.m. ET). Not confirmed on a current MX hours page (the URL tried returned 404).
+- **Cloudflare Access is not enabled** on Matt's account (API returns "Access is not enabled"). Per Cloudflare's setup docs, Matt must enable Zero Trust once in the dashboard: pick a team name, choose the Free plan, and enter payment details (required even on Free; not charged).
+- **Hostname gotcha:** a two-level name like `me.implied-open.soesraider.com` isn't covered by Cloudflare's free certificate (it only covers one level, `*.soesraider.com`). Use a one-level name such as `implied-open-me.soesraider.com`.
+- **Design notes for build:** besides Access on the hostname, the Pages Function should itself check the Access login token (`Cf-Access-Jwt-Assertion`) and refuse requests without a valid one, so the data can't leak through the `*.pages.dev` address or a preview link even if an Access setting is missed. Private site should share the public page's code rather than be a hand-copied second page.
+- Waiting on Matt's answers (structure A/B, hostname, show both TSX estimates, permission email). Nothing built yet.
 
 **Tools:** the Cloudflare API connector (`mcp__CloudFlare_MCP__*` tools: search / execute / docs) does Pages, DNS and Access. Supabase connector for the existing function. Show Matt screenshots (and the private URL working after login, plus proof that a logged-out request is blocked) and get his approval before merging any site change.
 
