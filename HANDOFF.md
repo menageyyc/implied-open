@@ -1,9 +1,10 @@
 # Handoff
 
-_Last updated: 2026-11-04 (contract-switch fix live; page tile order + fallback warning waiting for Matt's OK to merge)_
+_Last updated: 2026-11-04 (contract-switch fix live and merged, PR #17; next session: whole-project review)_
 
 ## Start here (fresh session)
-- **Contract-switch fix: LIVE since 2026-11-04** (Matt approved). Relay `implied-open` v5 and logger `implied-open-accuracy` v3 deployed; history Sep 14 – Nov 4 rebuilt. Page changes on branch `claude/sleepy-curie-ekj29f` (tile order, fallback warning, contract-switch days counted on /accuracy) await Matt's OK on the preview before merging. **First real test: Mon Dec 14, 2026** (switch to the March contract): check that morning that the page shows sensible numbers and no yellow "Data problem" note. See "Contract-switch fix" below.
+- **Next session: Matt will ask two critical-analysis questions covering a review of the entire project.** Read this file, README.md and the code (`site/`, `private/`, `supabase/`) before answering. Matt flagged that one may need a higher Opus effort level: if a question needs deep judgment (e.g. method soundness, data reliability, security, legal exposure), say so and suggest raising the effort before answering rather than answering lightly.
+- **Contract-switch fix: LIVE since 2026-11-04** (Matt approved). Relay `implied-open` v5 and logger `implied-open-accuracy` v3 deployed; history Sep 14 – Nov 4 rebuilt. Page changes (tile order, fallback warning, contract-switch days counted on /accuracy) approved by Matt and merged to main (PR #17), so both sites redeployed. **First real test: Mon Dec 14, 2026** (switch to the March contract): check that morning that the page shows sensible numbers and no yellow "Data problem" note. See "Contract-switch fix" below.
 - **Public site:** https://implied-open.soesraider.com (friends, no login).
 - **Private site:** https://implied-open-pvt.soesraider.com (Matt only, emailed-code login, 30-day sessions). Adds the Montreal Exchange SXF-based TSX estimate.
 - **Accuracy tracker (2026-11-04):** live at https://implied-open.soesraider.com/accuracy, approved and merged by Matt. The logger collects every 5 minutes. Matt wants to look at it live and may ask for changes. At his request the default comparison is the official open (9:35 price is the alternative). See "Accuracy tracker" below.
