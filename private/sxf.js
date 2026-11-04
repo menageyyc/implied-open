@@ -12,11 +12,12 @@
     const o = {}; p.forEach((x) => (o[x.type] = x.value));
     return { wd: o.weekday, mins: (+o.hour % 24) * 60 + +o.minute };
   }
+  // Same per-index yardstick as the public page (TSX cut-offs: 30th, 80th, 98th percentile of 5 years of daily moves).
   function sizeWord(a) {
     if (a < 0.1) return "barely any change";
-    if (a < 0.3) return "a small move";
-    if (a < 1) return "a moderate move, about the size of a typical trading day";
-    if (a < 2) return "a large move, bigger than most days";
+    if (a < 0.27) return "a small move";
+    if (a < 0.97) return "a moderate move, about the size of a typical trading day";
+    if (a < 2.18) return "a large move, bigger than most days";
     return "a very large move";
   }
 
@@ -45,13 +46,12 @@
     $("sxf-plain").textContent = msg;
   }
 
+  // The public page ends with a one-line footer; add the private version's method and the MX use note to it.
   function rewriteMethod() {
-    document.querySelectorAll(".method p").forEach((p) => {
-      const s = p.querySelector("strong");
-      if (s && s.textContent.trim() === "Canada.") {
-        p.innerHTML = `<strong>Canada (private version).</strong> The main TSX estimate uses S&amp;P/TSX 60 index futures (SXF) from the Montreal Exchange, read in real time from its public quotes page. It takes how far the front-month SXF contract has moved since its last daily settlement and applies that percentage to the S&amp;P/TSX Composite's last close. The TSX 60 is the 60 largest Canadian companies, which make up most of the Composite's value, so the two usually move closely together but not identically. The "now" price is the midpoint of the current bid and ask when the gap between them is tight, otherwise the last trade. The SXF estimate is hidden from 4 to 8 p.m. Eastern on weekdays, between SXF's close and its next session, when the settlement and the index close can be from different days. The S&amp;P 500 futures stand-in from the public page is kept below it for comparison. Oil, natural gas, gold and the Canadian dollar come from Yahoo Finance; the 10-year yield from the Bank of Canada. Montreal Exchange data on this page is for personal use only and must not be shared.`;
-      }
-    });
+    const f = document.querySelector(".foot");
+    if (!f || f.dataset.sxf) return;
+    f.dataset.sxf = "1";
+    f.insertAdjacentHTML("beforeend", ` <strong>Private version:</strong> the main TSX estimate applies the move in the front-month S&amp;P/TSX 60 futures (SXF, Montreal Exchange, real time) since their last settlement to the TSX's last close, using the bid/ask midpoint when it's tight, otherwise the last trade. It's hidden 4 to 8 p.m. Eastern on weekdays, when the settlement and the close can be from different days. The S&amp;P 500 stand-in is kept below for comparison. Montreal Exchange data on this page is for personal use only and must not be shared.`);
   }
 
   async function afterRender(j, results) {
