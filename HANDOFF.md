@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-04_
+_Last updated: 2026-11-04 (end of first session)_
 
 ## Status
 - The data relay is deployed and working: Supabase project "Menage", Edge Function `implied-open`, version 3. It covers four indexes, including the Nasdaq Composite (it uses NQ futures as a stand-in).
@@ -18,5 +18,12 @@ _Last updated: 2026-11-04_
 - Market holidays aren't handled.
 - The Composite estimate is a proxy.
 
-## Open question
-- Matt asked to add Canadian indicators. Yahoo has the S&P/TSX Composite (^GSPTSE) but no TSX 60 futures (SXF trades on the Montreal Exchange, which has no free feed). Approach pending Matt's choice.
+## Pending
+- **PR #4 (Canada section)** on branch `claude/canada` is waiting for Matt's approval. It adds a TSX estimate from S&P 500 futures, plus oil, gas, gold, CAD and the Canada 10-year yield as drivers. Function v4 is already deployed and backward-compatible with main.
+- **Cloudflare is now connected as a claude.ai connector** (from 2026-11-04). Next session: check what the connector can do. Set up Cloudflare Pages from this repo (output dir `site`) with the custom domain `implied-open.soesraider.com` if the connector allows. Otherwise walk Matt through the dashboard steps. Then check the live URL: it loads, live prices appear, and it sends `X-Robots-Tag: noindex`.
+
+## To revisit: Montreal Exchange (TSX 60 futures, SXF)
+- The m-x.ca quotes page shows live SXF bid/ask/settlement in its HTML, but the MX terms of use say content may be accessed and viewed for "strict personal, private and non-commercial use" only. They forbid retrieving, posting on the Internet or providing it to the public without the Bourse's prior authorization.
+- **Rule: MX data must never appear on the public site.** Don't republish it anywhere public.
+- Idea to evaluate: a **separate private, password-protected page for Matt only**, so he has his own tool that doesn't rely on Claude. For example, a second Cloudflare Pages route behind Cloudflare Access (email one-time code), with its own function fetching SXF.
+- Before building it, read the MX terms again carefully. A private page is closer to "personal use", but it still involves automated retrieval, which the terms also restrict. The clean route is to ask the Bourse for permission (offer drafted, not yet written) or use a licensed data vendor. Give Matt a clear recommendation and let him decide.
