@@ -126,7 +126,7 @@ tr.hl td { font-weight: 500; }
     <p><strong>The actual open.</strong> At 9:30:00 many stocks haven't made their first trade yet, so an index's official opening number is partly built from the previous day's prices and tends to understate the real move. The default comparison is the official open. You can switch to the index level at 9:35 a.m., when nearly every stock has traded, with "Compare with".</p>
     <p><strong>The "no change" guess</strong> assumes the index opens exactly at the previous close. An estimate is only useful if it beats that.</p>
     <p><strong>Rebuilt history.</strong> Days before Nov 4, 2026 were rebuilt from Yahoo's 5-minute futures history using the same formula (marked "rebuilt"). From Nov 4, 2026 on, the estimates are saved live as the page would show them.</p>
-    <p><strong>Futures contract-switch days.</strong> Each quarter (March, June, September, December) the futures roll to the next contract, which trades at a different price. For a few days around the switch Yahoo's data mixes the two contracts and the estimate can be off by close to 1%. Those days (Tuesday of expiry week through the following Monday) are left out of the averages unless you tick the box, and show in grey on the day-by-day chart.</p>
+    <p><strong>Futures contract-switch days.</strong> Each quarter (March, June, September, December) the futures roll to the next contract, which trades at a different price. Until November 2026, Yahoo's data mixed the two contracts for a few days around the switch and the estimate could be off by close to 1%. The page and this tracker now use one specific contract throughout, and the September 2026 days were rebuilt that way, so these days (Tuesday of expiry week through the following Monday) are counted like any other. They still show in grey on the day-by-day chart, and you can untick the box to leave them out.</p>
     <p><strong>Holidays</strong> have no open, so they're simply skipped. Source: Yahoo Finance.</p>
   </section>
 </div>
@@ -138,7 +138,7 @@ tr.hl td { font-weight: 500; }
   const CMP = [["o", "Official open"], ["p", "Price at 9:35"]];
   const GLANCE = [480, 240, 30, 20, 10, 0];
   const DAYH = [480, 240, 30, 20, 10];
-  const state = { key: "spx", cmp: "o", roll: false, h: 10, data: null };
+  const state = { key: "spx", cmp: "o", roll: true, h: 10, data: null };
   const $ = (id) => document.getElementById(id);
   const fmt = (n, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
   const sgn = (n) => (n > 0 ? "+" : n < 0 ? "−" : "");

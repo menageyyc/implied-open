@@ -99,7 +99,13 @@ Deno.serve(async (req) => {
     const target = targetDate(Date.now());
     // Specific contract first; if Yahoo ever stops serving it, fall back to the continuous series
     // (correct except in the days around an expiry).
-    const future = (root: string) => get(contractFor(root, target)).catch(() => get(`${root}=F`));
+    // Retried on every request, so it recovers by itself as soon as Yahoo serves the contract again.
+    // `fallback: true` tells the page to show a warning.
+    const future = (root: string) => {
+      const contract = contractFor(root, target);
+      return get(contract).then((f) => ({ ...f, contract, fallback: false }))
+        .catch(() => get(`${root}=F`).then((f) => ({ ...f, contract, fallback: true })));
+    };
     const [pairs, drivers, bond] = await Promise.all([
       Promise.all(PAIRS.map(async (p) => {
         const [idx, fut] = await Promise.all([get(p.index), future(p.future)]);

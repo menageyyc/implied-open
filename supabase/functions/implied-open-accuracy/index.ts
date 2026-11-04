@@ -172,11 +172,19 @@ async function tick() {
   // Snapshot: only while a futures price can count toward an upcoming open.
   const snaps: Record<string, unknown>[] = [];
   const notes: string[] = [];
-  const tNow = targetFor(Math.floor(now / 300000) * 300000);
+  // The open these snapshots count toward, to pick the contract. Yahoo's futures run ~10 minutes
+  // behind, so just after 9:30 the latest price can still be from before the open: look back 30 min.
+  const tNow = targetFor(Math.floor(now / 300000) * 300000) ?? targetFor(Math.floor((now - 30 * 60000) / 300000) * 300000);
   for (const p of PAIRS) {
     try {
       if (!tNow) { notes.push(`${p.key}: outside the snapshot window`); continue; }
-      const fut = await get(contractFor(p.future, tNow.target), "5d", "1d");
+      // Same fallback as the relay (continuous series if Yahoo stops serving the contract), so the
+      // tracker keeps measuring what the page shows; noted in the tick result.
+      const contract = contractFor(p.future, tNow.target);
+      const fut = await get(contract, "5d", "1d").catch(async () => {
+        notes.push(`${p.key}: ${contract} unavailable, used ${p.future}=F`);
+        return get(`${p.future}=F`, "5d", "1d");
+      });
       const ms = fut.time * 1000;
       if (now - ms > 30 * 60000) { notes.push(`${p.key}: futures price is stale`); continue; }
       const slot = Math.floor(ms / 300000) * 300000;
