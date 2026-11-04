@@ -123,7 +123,7 @@ tr.hl td { font-weight: 500; }
     <h3>What's being measured</h3>
     <p><strong>The estimate.</strong> Exactly the main page's calculation (last close + the futures move since that close), saved every 5 minutes from 6 p.m. Eastern the evening before until 9:30 a.m.</p>
     <p><strong>Times are futures-price times.</strong> Yahoo's futures prices run about 10 minutes behind, so each estimate is filed under the time of the futures price it used, not the clock time. For example, the "9:20 a.m." estimate is what the page showed at about 9:30.</p>
-    <p><strong>The actual open.</strong> At 9:30:00 many stocks haven't made their first trade yet, so an index's official opening number is partly built from the previous day's prices and tends to understate the real move. That's why the default comparison is the index level at 9:35 a.m., when nearly every stock has traded. You can switch to the official open with "Compare with".</p>
+    <p><strong>The actual open.</strong> At 9:30:00 many stocks haven't made their first trade yet, so an index's official opening number is partly built from the previous day's prices and tends to understate the real move. The default comparison is the official open. You can switch to the index level at 9:35 a.m., when nearly every stock has traded, with "Compare with".</p>
     <p><strong>The "no change" guess</strong> assumes the index opens exactly at the previous close. An estimate is only useful if it beats that.</p>
     <p><strong>Rebuilt history.</strong> Days before Nov 4, 2026 were rebuilt from Yahoo's 5-minute futures history using the same formula (marked "rebuilt"). From Nov 4, 2026 on, the estimates are saved live as the page would show them.</p>
     <p><strong>Futures contract-switch days.</strong> Each quarter (March, June, September, December) the futures roll to the next contract, which trades at a different price. For a few days around the switch Yahoo's data mixes the two contracts and the estimate can be off by close to 1%. Those days (Tuesday of expiry week through the following Monday) are left out of the averages unless you tick the box, and show in grey on the day-by-day chart.</p>
@@ -135,10 +135,10 @@ tr.hl td { font-weight: 500; }
 (function () {
   const API = "https://awagbieeouxxhytdhloi.supabase.co/functions/v1/implied-open-accuracy";
   const KEYS = [["spx", "S&P 500"], ["ndx", "Nasdaq-100"], ["ixic", "Nasdaq Composite"], ["dji", "Dow"], ["tsx", "S&P/TSX"]];
-  const CMP = [["p", "Price at 9:35"], ["o", "Official open"]];
+  const CMP = [["o", "Official open"], ["p", "Price at 9:35"]];
   const GLANCE = [480, 240, 30, 20, 10, 0];
   const DAYH = [480, 240, 30, 20, 10];
-  const state = { key: "spx", cmp: "p", roll: false, h: 10, data: null };
+  const state = { key: "spx", cmp: "o", roll: false, h: 10, data: null };
   const $ = (id) => document.getElementById(id);
   const fmt = (n, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
   const sgn = (n) => (n > 0 ? "+" : n < 0 ? "−" : "");
