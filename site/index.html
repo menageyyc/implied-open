@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Implied Open</title>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="Where the S&amp;P 500, Nasdaq-100 and Dow are likely to open, estimated live from overnight futures.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600&display=swap">
+<style>
+/* Layout: headline summary band, three index panels that stack on phones, then a short "how to read this" note. */
+:root {
+  --bg: #f3f5f7; --panel: #ffffff; --ink: #14202b; --muted: #5b6875; --line: #d9dfe5;
+  --accent: #1f5f8b; --up: #1d7a4f; --up-bg: #e3f3ea; --down: #b2362b; --down-bg: #f9e5e2;
+  --flat-bg: #e9edf1; --warn-bg: #fff4d6; --warn-ink: #7a5800;
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f161d; --panel: #17212b; --ink: #e6ecf1; --muted: #93a1ae; --line: #2a3742;
+    --accent: #6fb0dd; --up: #5fd19a; --up-bg: #143024; --down: #ff8a7c; --down-bg: #3a1c19;
+    --flat-bg: #22303c; --warn-bg: #3a3014; --warn-ink: #f2d27a; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 28px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 22px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 2rem; line-height: 1.1; margin: 0; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 60ch; }
+button { font: 500 0.95rem var(--body); padding: 10px 16px; border-radius: 8px; border: 1px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.6; cursor: wait; }
+.summary { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: grid; gap: 8px; }
+.summary h2 { font-family: var(--display); font-weight: 600; font-size: 1.35rem; line-height: 1.25; margin: 0; text-wrap: balance; }
+.summary p { margin: 0; max-width: 75ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.85rem; color: var(--muted); }
+.note { padding: 10px 14px; border-radius: 8px; background: var(--flat-bg); font-size: 0.9rem; }
+.note.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 560px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+.big { overflow-wrap: anywhere; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card h3 { margin: 0; font-size: 1rem; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+.card h3 span { font: 400 0.75rem var(--mono); color: var(--muted); letter-spacing: 0.04em; }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.big { font: 500 1.85rem var(--mono); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.pill { display: inline-flex; gap: 8px; font: 500 0.9rem var(--mono); font-variant-numeric: tabular-nums; padding: 3px 10px; border-radius: 6px; background: var(--flat-bg); width: fit-content; }
+.pill.up { background: var(--up-bg); color: var(--up); }
+.pill.down { background: var(--down-bg); color: var(--down); }
+.card p { margin: 0; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; border-top: 1px solid var(--line); padding-top: 10px; font-size: 0.85rem; }
+dt { color: var(--muted); }
+dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.method { color: var(--muted); font-size: 0.88rem; display: grid; gap: 6px; max-width: 75ch; }
+.method h3 { color: var(--ink); font-size: 0.95rem; margin: 0; }
+.method p { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Implied Open</h1>
+      <p class="sub">Where the S&amp;P 500, Nasdaq and Dow are likely to open at 9:30 a.m. Eastern, worked out live from overnight futures trading.</p>
+    </div>
+    <button id="refresh" type="button">Refresh</button>
+  </header>
+
+  <section class="summary" aria-live="polite">
+    <h2 id="headline">Loading the latest prices…</h2>
+    <p id="explain"></p>
+    <div class="note" id="timing" hidden></div>
+    <div class="meta" id="meta"></div>
+  </section>
+
+  <div class="grid" id="cards"></div>
+
+  <section class="method">
+    <h3>How to read this</h3>
+    <p><strong>What "implied open" means.</strong> The stock market is closed overnight, but futures on the S&amp;P 500, Nasdaq-100 and Dow trade almost around the clock. However far a futures contract has moved since the market closed at 4 p.m. Eastern, the index is expected to open roughly that far up or down. Implied open = last close + that futures move.</p>
+    <p><strong>It gets more accurate closer to the open.</strong> Overnight trading is light, so prices drift and can swing on little news. More traders join from about 8 a.m. Eastern, and economic reports often come out at 8:30 a.m. An estimate taken a few minutes before 9:30 is usually much closer to the real open than one taken the night before.</p>
+    <p><strong>Limits.</strong> It's an estimate, not a forecast or advice. The first printed index level can differ a little, because not every stock starts trading at exactly 9:30. Prices come from Yahoo Finance's free feed, where futures prices run about 10 minutes behind and which isn't officially supported. Market holidays aren't accounted for. Futures used: E-mini S&amp;P 500 (ES), E-mini Nasdaq-100 (NQ), Mini Dow (YM). The Nasdaq Composite has no futures of its own, so it borrows the NQ percentage move. The page refreshes itself every minute.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  const RELAY = "https://awagbieeouxxhytdhloi.supabase.co/functions/v1/implied-open";
+  const META = {
+    spx: { short: "S&P 500", fut: "ES", desc: "the 500 largest US companies" },
+    ndx: { short: "Nasdaq-100", fut: "NQ", desc: "large tech-heavy Nasdaq companies" },
+    ixic: { short: "Nasdaq Composite", fut: "NQ", proxy: true, desc: "nearly every Nasdaq-listed stock" },
+    dji: { short: "Dow", fut: "YM", desc: "30 large blue-chip companies" },
+  };
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const sign = (n) => (n >= 0 ? "+" : "−");
+
+  function et(ms) {
+    const p = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false, weekday: "short" }).formatToParts(new Date(ms));
+    const o = {}; p.forEach((x) => (o[x.type] = x.value));
+    return { date: `${o.year}-${o.month}-${o.day}`, mins: (+o.hour % 24) * 60 + +o.minute, wd: o.weekday };
+  }
+  const etLabel = (ms, withDay = true) => new Date(ms).toLocaleString("en-US", Object.assign({ timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }, withDay ? { weekday: "short", month: "short", day: "numeric" } : {})) + " ET";
+  const dateLabel = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+  const isWeekday = (wd) => !["Sat", "Sun"].includes(wd);
+
+  function sizeWord(absPct) {
+    if (absPct < 0.1) return "barely any change";
+    if (absPct < 0.3) return "a small move, well within a normal day's ups and downs";
+    if (absPct < 1) return "a moderate move, about the size of a typical trading day";
+    if (absPct < 2) return "a large move, bigger than most days";
+    return "a very large move, the kind that happens only a few times a year";
+  }
+
+  function untilOpen(nowMs) {
+    const n = et(nowMs);
+    if (isWeekday(n.wd) && n.mins < 570) return 570 - n.mins;
+    return null;
+  }
+
+  function buildCards() {
+    $("cards").innerHTML = Object.entries(META).map(([k, m]) => `
+      <article class="card" id="card-${k}">
+        <h3>${m.short}<span>${m.proxy ? "uses NQ futures" : m.fut + " futures"}</span></h3>
+        <div><div class="label" id="lab-${k}">Implied open</div><div class="big" id="open-${k}">—</div></div>
+        <div class="pill" id="chg-${k}">—</div>
+        <p id="plain-${k}"></p>
+        <dl>
+          <dt id="cl-${k}">Last close</dt><dd id="close-${k}">—</dd>
+          <dt>${m.proxy ? "NQ futures" : "Futures"} at that close</dt><dd id="fref-${k}">—</dd>
+          <dt>${m.proxy ? "NQ futures" : "Futures"} now</dt><dd id="fnow-${k}">—</dd>
+        </dl>
+      </article>`).join("");
+  }
+
+  function render(j) {
+    const now = j.fetchedAt, n = et(now);
+    const results = [];
+    let marketOpen = false, newestFut = 0;
+    for (const p of j.pairs) {
+      const m = META[p.key]; if (!m) continue;
+      const bars = p.index.bars, last = bars[bars.length - 1];
+      const lastDate = et(last.t * 1000).date;
+      const openNow = lastDate === n.date && n.mins >= 570 && n.mins < 960;
+      marketOpen = marketOpen || openNow;
+      const closeBar = openNow && bars.length > 1 ? bars[bars.length - 2] : last;
+      const closeDate = et(closeBar.t * 1000).date;
+      const fRef = p.future.bars.find((b) => et(b.t * 1000).date === closeDate);
+      if (!fRef) throw new Error(`no ${m.fut} futures price for ${closeDate}`);
+      const fNow = p.future.price, fPts = fNow - fRef.close;
+      // Real futures: shift by the futures' point move. Proxy (Composite): apply the NQ percentage move.
+      const pct = m.proxy ? (fPts / fRef.close) * 100 : (fPts / closeBar.close) * 100;
+      const pts = m.proxy ? closeBar.close * pct / 100 : fPts, implied = closeBar.close + pts;
+      newestFut = Math.max(newestFut, p.future.time * 1000);
+      results.push({ k: p.key, m, close: closeBar.close, closeDate, fRef: fRef.close, fNow, pts, implied, pct, openNow, todayOpen: openNow ? last.open : null });
+
+      $(`cl-${p.key}`).textContent = `Last close (${dateLabel(closeDate)})`;
+      $(`close-${p.key}`).textContent = fmt(closeBar.close);
+      $(`fref-${p.key}`).textContent = fmt(fRef.close);
+      $(`fnow-${p.key}`).textContent = fmt(fNow);
+      if (openNow && last.open) {
+        const oPts = last.open - closeBar.close, oPct = (oPts / closeBar.close) * 100;
+        const oDir = Math.abs(oPct) < 0.005 ? "flat" : oPts > 0 ? "up" : "down";
+        $(`lab-${p.key}`).textContent = "Opened today at";
+        $(`open-${p.key}`).textContent = fmt(last.open);
+        $(`chg-${p.key}`).className = "pill" + (oDir === "flat" ? "" : " " + oDir);
+        $(`chg-${p.key}`).textContent = `${sign(oPts)}${fmt(Math.abs(oPts), 1)} pts  ${sign(oPct)}${fmt(Math.abs(oPct), 2)}%`;
+        $(`plain-${p.key}`).textContent = `The ${m.short} opened ${fmt(Math.abs(oPct), 2)}% ${oDir === "up" ? "above" : "below"} its ${dateLabel(closeDate)} close. The next estimate starts after today's 4 p.m. Eastern close.`;
+        continue;
+      }
+      const dir = Math.abs(pct) < 0.005 ? "flat" : pts > 0 ? "up" : "down";
+      $(`lab-${p.key}`).textContent = "Implied open";
+      $(`open-${p.key}`).textContent = fmt(implied);
+      $(`chg-${p.key}`).className = "pill" + (dir === "flat" ? "" : " " + dir);
+      $(`chg-${p.key}`).textContent = `${sign(pts)}${fmt(Math.abs(pts), 1)} pts  ${sign(pct)}${fmt(Math.abs(pct), 2)}%`;
+      $(`plain-${p.key}`).textContent = m.proxy
+        ? `No futures trade on the Composite, so this applies the Nasdaq-100 futures move (${sign(pct)}${fmt(Math.abs(pct), 2)}%) as a stand-in. The two indexes usually move together, but the Composite also holds thousands of smaller companies, so treat this as rougher than the others. It points to the ${m.short} opening about ${fmt(Math.abs(pct), 2)}% ${pct >= 0 ? "higher" : "lower"}.`
+        : dir === "flat"
+        ? `${m.fut} futures are about where they were at the close, so the ${m.short} (${m.desc}) is expected to open roughly unchanged.`
+        : `${m.fut} futures are ${fmt(Math.abs(pts), pts >= 100 || pts <= -100 ? 0 : 1)} points ${dir === "up" ? "above" : "below"} where they were at the ${dateLabel(closeDate)} close. That points to the ${m.short} (${m.desc}) opening about ${fmt(Math.abs(pct), 2)}% ${dir === "up" ? "higher" : "lower"}, ${sizeWord(Math.abs(pct))}.`;
+    }
+
+    // Headline and explanation
+    const all = results;
+    const core = results.filter((r) => !r.m.proxy);
+    const ups = core.filter((r) => r.pct >= 0.05), downs = core.filter((r) => r.pct <= -0.05);
+    const sorted = [...core].sort((a, b) => a.pct - b.pct);
+    const n3 = core.length;
+    const list = (rs) => rs.map((r) => `${r.m.short} ${sign(r.pct)}${fmt(Math.abs(r.pct), 2)}%`).join(", ");
+    let head;
+    if (marketOpen) head = "The market is open. Here's how each index opened today.";
+    else if (downs.length === n3) head = `Futures point to a lower open across the board.`;
+    else if (ups.length === n3) head = `Futures point to a higher open across the board.`;
+    else if (!ups.length && !downs.length) head = `Futures point to a roughly flat open.`;
+    else head = `Futures point to a mixed open.`;
+    $("headline").textContent = head;
+
+    const big = Math.max(...core.map((r) => Math.abs(r.pct)));
+    let ex = marketOpen ? "" : `${list(all)}. `;
+    if (!marketOpen && n3 >= 2) {
+      const weakest = sorted[0], strongest = sorted[sorted.length - 1];
+      if (downs.length === n3) ex += `Of the three with their own futures, the ${weakest.m.short} is set to fall the most and the ${strongest.m.short} the least. `;
+      else if (ups.length === n3) ex += `Of the three with their own futures, the ${strongest.m.short} is set to gain the most and the ${weakest.m.short} the least. `;
+      ex += `Overall this is ${sizeWord(big)}.`;
+      if (results.find((r) => r.k === "ndx") && Math.abs(results.find((r) => r.k === "ndx").pct) > Math.abs(results.find((r) => r.k === "dji").pct) * 1.5 && big >= 0.3)
+        ex += ` The Nasdaq-100 moving most usually means technology stocks are leading the move.`;
+    } else if (marketOpen) {
+      ex += `This page estimates the open before trading starts. Come back after the 4 p.m. Eastern close for the next trading day's estimate. It becomes most useful in the hour before 9:30 a.m.`;
+    }
+    $("explain").textContent = ex;
+
+    const t = $("timing"); const mins = untilOpen(now);
+    const futAgeMin = (now - newestFut) / 60000;
+    t.hidden = false; t.className = "note";
+    if (marketOpen) { t.hidden = true; }
+    else if (futAgeMin > 30) { t.className = "note warn"; t.textContent = `Futures aren't trading right now (they pause 5–6 p.m. Eastern on weekdays and from Friday 5 p.m. to Sunday 6 p.m.). Showing the last prices, from ${etLabel(newestFut)}.`; }
+    else if (mins != null && mins <= 30) t.textContent = `The market opens in ${mins} minute${mins === 1 ? "" : "s"}. This close to the open, the estimate is usually reliable.`;
+    else if (mins != null) { t.className = "note warn"; t.textContent = `The market opens in ${Math.floor(mins / 60)} h ${mins % 60} min. Estimates this early often change. They become more reliable after about 8 a.m. Eastern, and most reliable in the last few minutes before 9:30.`; }
+    else { t.className = "note warn"; t.textContent = `The next open is the next trading day at 9:30 a.m. Eastern. Overnight estimates often change, so check again closer to the open.`; }
+
+    $("meta").innerHTML = `<span>Futures prices as of ${etLabel(newestFut)} (about 10 minutes delayed)</span><span>Updated ${etLabel(now)}</span><span>Source: Yahoo Finance</span>`;
+  }
+
+  async function load() {
+    const b = $("refresh"); b.disabled = true; b.textContent = "Refreshing…";
+    try {
+      const res = await fetch(RELAY, { cache: "no-store" });
+      if (!res.ok) throw new Error("the price service answered with an error (" + res.status + ")");
+      const j = await res.json();
+      if (j.error) throw new Error(j.error);
+      render(j);
+    } catch (e) {
+      $("headline").textContent = "Prices couldn't be loaded right now.";
+      $("explain").textContent = `Reason: ${e.message || "network error"}. The page will try again in a minute, or press Refresh.`;
+    } finally { b.disabled = false; b.textContent = "Refresh"; }
+  }
+
+  buildCards();
+  $("refresh").addEventListener("click", load);
+  load();
+  setInterval(() => { if (!document.hidden) load(); }, 60000);
+})();
+</script>
+</body>
+</html>
