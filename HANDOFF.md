@@ -8,10 +8,6 @@ _Last updated: 2026-11-04 (end of first session)_
 - Site merged into main (PR #2, approved by Matt). Not yet hosted. Plan: Cloudflare Pages connected to this repo, served at **implied-open.soesraider.com** (Matt's choice). Domain DNS is already on Cloudflare.
 - The old private Claude artifact version was deleted at Matt's request.
 
-## Next steps
-1. Cloudflare Pages: Workers & Pages → Create → Pages → Connect to Git → `menageyyc/implied-open`. Framework preset "None", build command empty, build output directory `site`. Then Custom domains → `implied-open.soesraider.com`.
-2. After it goes live, check that the URL loads, live prices appear, and the response carries `X-Robots-Tag: noindex`.
-
 ## Known limits
 - Yahoo Finance's chart feed is unofficial. If it breaks, the function needs updating.
 - Futures prices are about 10 minutes delayed.
@@ -20,7 +16,10 @@ _Last updated: 2026-11-04 (end of first session)_
 
 ## Pending
 - **PR #4 (Canada section)** on branch `claude/canada` is waiting for Matt's approval. It adds a TSX estimate from S&P 500 futures, plus oil, gas, gold, CAD and the Canada 10-year yield as drivers. Function v4 is already deployed and backward-compatible with main.
-- **Cloudflare is now connected as a claude.ai connector** (from 2026-11-04). Next session: check what the connector can do. Set up Cloudflare Pages from this repo (output dir `site`) with the custom domain `implied-open.soesraider.com` if the connector allows. Otherwise walk Matt through the dashboard steps. Then check the live URL: it loads, live prices appear, and it sends `X-Robots-Tag: noindex`.
+- **Hosting not set up yet.** Matt connected the "Cloudflare Developer Platform" connector on 2026-11-04. It only offers Workers read, KV, R2, D1, Hyperdrive and docs search: no Pages, deploys or custom domains. Its own notice says it's deprecated in favour of the **Cloudflare API MCP server (https://mcp.cloudflare.com/mcp)**, which covers the full API.
+  - If that newer connector is available, use it to create the site: Pages, or Workers with static assets, from `site/`, with custom domain `implied-open.soesraider.com` (DNS zone already on Cloudflare).
+  - Otherwise walk Matt through the dashboard: Workers & Pages → Create → Pages → Connect to Git → `menageyyc/implied-open`, preset None, no build command, output dir `site`, then Custom domains → `implied-open.soesraider.com`. Connecting to Git needs Matt's own GitHub approval in the browser either way.
+  - Then check the live URL: it loads, live prices appear, and it sends `X-Robots-Tag: noindex`.
 
 ## To revisit: Montreal Exchange (TSX 60 futures, SXF)
 - The m-x.ca quotes page shows live SXF bid/ask/settlement in its HTML, but the MX terms of use say content may be accessed and viewed for "strict personal, private and non-commercial use" only. They forbid retrieving, posting on the Internet or providing it to the public without the Bourse's prior authorization.
