@@ -109,7 +109,9 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     <h3>How to read this</h3>
     <p><strong>What "implied open" means.</strong> The stock market is closed overnight, but futures on the S&amp;P 500, Nasdaq-100 and Dow trade almost around the clock. However far a futures contract has moved since the market closed at 4 p.m. Eastern, the index is expected to open roughly that far up or down. Implied open = last close + that futures move.</p>
     <p><strong>It gets more accurate closer to the open.</strong> Overnight trading is light, so prices drift and can swing on little news. More traders join from about 8 a.m. Eastern, and economic reports often come out at 8:30 a.m. An estimate taken a few minutes before 9:30 is usually much closer to the real open than one taken the night before.</p>
-    <p><strong>Limits.</strong> It's an estimate, not a forecast or advice. The first printed index level can differ a little, because not every stock starts trading at exactly 9:30. Prices come from Yahoo Finance's free feed, where futures prices run about 10 minutes behind and which isn't officially supported. Market holidays aren't accounted for. Futures used: E-mini S&amp;P 500 (ES), E-mini Nasdaq-100 (NQ), Mini Dow (YM). The Nasdaq Composite has no futures of its own, so it borrows the NQ percentage move. The page refreshes itself every minute.</p>
+    <p><strong>After the open.</strong> From 9:30 each card shows where the index actually opened: its level at 9:31, after the first full minute of trading. The very first printed level often lags the real move, because at 9:30:00 many stocks haven't traded yet and the index still counts them at yesterday's prices. For a minute or so after 9:30, while that first minute plays out, the card keeps showing the last estimate.</p>
+    <p><strong>Holidays and early closes.</strong> The page knows the US and Canadian market holidays and 1 p.m. early closes through 2027, so on a holiday or the evening before one it estimates the next real open, and the TSX card follows Canada's calendar. After a 1 p.m. close, "futures at that close" is the futures price at 1 p.m., when stocks stopped trading (futures carry on until 1:15).</p>
+    <p><strong>Limits.</strong> It's an estimate, not a forecast or advice. Prices come from Yahoo Finance's free feed, where futures prices run about 10 minutes behind and which isn't officially supported. Futures used: E-mini S&amp;P 500 (ES), E-mini Nasdaq-100 (NQ), Mini Dow (YM). The Nasdaq Composite has no futures of its own, so it borrows the NQ percentage move. The page refreshes itself every minute.</p>
     <p><strong>Track record.</strong> <a href="/accuracy">See how close past estimates came to the real open</a>, by index and by how early the estimate was taken.</p>
     <p><strong>Canada.</strong> Canadian index futures (TSX 60, traded on the Montreal Exchange) have no free public feed, so the TSX estimate borrows the S&amp;P 500 futures move. That makes it the roughest number on the page. The TSX usually moves in the same direction as the S&amp;P, but it leans much more on banks, energy and mining, so check the drivers. Oil, natural gas, gold and the Canadian dollar come from Yahoo Finance. The Government of Canada 10-year bond yield comes from the Bank of Canada and is updated once a day, so it shows the latest published close, not an overnight move.</p>
   </section>
@@ -159,9 +161,52 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     return date >= mon && date <= next;
   }
 
+  // ---------- Market calendars ----------
+  // Full closures and 1 p.m. ET early closes. Checked 2026-11-04 against the official pages
+  // (nyse.com/markets/hours-calendars and tsx.com's trading calendar). The same lists are in
+  // supabase/functions/implied-open/index.ts and supabase/functions/implied-open-accuracy/index.ts: change all three together.
+  // They end with 2027: add 2028 before then (after the last listed date, only weekends are skipped).
+  const CAL = {
+    us: {
+      closed: {
+        "2026-01-01": "New Year's Day", "2026-01-19": "Martin Luther King Jr. Day", "2026-02-16": "Washington's Birthday",
+        "2026-04-03": "Good Friday", "2026-05-25": "Memorial Day", "2026-06-19": "Juneteenth", "2026-07-03": "Independence Day (observed)",
+        "2026-09-07": "Labor Day", "2026-11-26": "Thanksgiving", "2026-12-25": "Christmas",
+        "2027-01-01": "New Year's Day", "2027-01-18": "Martin Luther King Jr. Day", "2027-02-15": "Washington's Birthday",
+        "2027-03-26": "Good Friday", "2027-05-31": "Memorial Day", "2027-06-18": "Juneteenth (observed)", "2027-07-05": "Independence Day (observed)",
+        "2027-09-06": "Labor Day", "2027-11-25": "Thanksgiving", "2027-12-24": "Christmas (observed)",
+      },
+      early: { "2026-11-27": "the day after Thanksgiving", "2026-12-24": "Christmas Eve", "2027-11-26": "the day after Thanksgiving" },
+    },
+    ca: {
+      closed: {
+        "2026-01-01": "New Year's Day", "2026-02-16": "Family Day", "2026-04-03": "Good Friday", "2026-05-18": "Victoria Day",
+        "2026-07-01": "Canada Day", "2026-08-03": "Civic Holiday", "2026-09-07": "Labour Day", "2026-10-12": "Thanksgiving",
+        "2026-12-25": "Christmas", "2026-12-28": "Boxing Day (observed)",
+        "2027-01-01": "New Year's Day", "2027-02-15": "Family Day", "2027-03-26": "Good Friday", "2027-05-24": "Victoria Day",
+        "2027-07-01": "Canada Day", "2027-08-02": "Civic Holiday", "2027-09-06": "Labour Day", "2027-10-11": "Thanksgiving",
+        "2027-12-27": "Christmas (observed)", "2027-12-28": "Boxing Day (observed)",
+      },
+      early: { "2026-12-24": "Christmas Eve", "2027-12-24": "Christmas Eve" },
+    },
+  };
+  const addDays = (date, n) => new Date(Date.parse(date + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
+  const isTradingDay = (cal, date) => { const wd = new Date(date + "T12:00:00Z").getUTCDay(); return wd !== 0 && wd !== 6 && !(date in CAL[cal].closed); };
+  const closeMin = (cal, date) => (date in CAL[cal].early ? 780 : 960); // 1 p.m. or 4 p.m.
+  const closeLabel = (cal, date) => (closeMin(cal, date) === 780 ? "1 p.m." : "4 p.m.");
+  function nextTradingDay(cal, date) { let d = addDays(date, 1); while (!isTradingDay(cal, d)) d = addDays(d, 1); return d; }
+  // The next open a market's estimate is for: today until its close, otherwise its next trading day.
+  const targetOf = (cal, n) => (isTradingDay(cal, n.date) && n.mins < closeMin(cal, n.date) ? n.date : nextTradingDay(cal, n.date));
+  // Weekday holidays from today (or tomorrow, once today's session is over) up to the next open, e.g. "Thu Nov 26 (Thanksgiving)".
+  function holidaysBefore(cal, n, target) {
+    const out = [];
+    for (let d = n.date; d < target; d = addDays(d, 1)) if (CAL[cal].closed[d]) out.push(d);
+    return out;
+  }
+
   function untilOpen(nowMs) {
     const n = et(nowMs);
-    if (isWeekday(n.wd) && n.mins < 570) return 570 - n.mins;
+    if (isTradingDay("us", n.date) && n.mins < 570) return 570 - n.mins;
     return null;
   }
 
@@ -174,7 +219,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
         <p id="plain-${k}"></p>
         <dl>
           <dt id="cl-${k}">Last close</dt><dd id="close-${k}">—</dd>
-          <dt>${m.proxy ? m.fut + " futures" : "Futures"} at that close</dt><dd id="fref-${k}">—</dd>
+          <dt id="frl-${k}">${m.proxy ? m.fut + " futures" : "Futures"} at that close</dt><dd id="fref-${k}">—</dd>
           <dt>${m.proxy ? m.fut + " futures" : "Futures"} now</dt><dd id="fnow-${k}">—</dd>
         </dl>
       </article>`).join("");
@@ -183,46 +228,94 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     $("ca-cards").innerHTML = html(rows.filter(([, m]) => m.region === "ca"));
   }
 
+  function setPill(k, pts, pct) {
+    const dir = Math.abs(pct) < 0.005 ? "flat" : pts > 0 ? "up" : "down";
+    $(`chg-${k}`).className = "pill" + (dir === "flat" ? "" : " " + dir);
+    $(`chg-${k}`).textContent = `${sign(pts)}${fmt(Math.abs(pts), 1)} pts  ${sign(pct)}${fmt(Math.abs(pct), 2)}%`;
+    return dir;
+  }
+
   function render(j) {
     const now = j.fetchedAt, n = et(now);
     const results = [];
-    let marketOpen = false, newestFut = 0;
+    let marketOpen = false, opening = false, firstPrint = false, newestFut = 0;
     for (const p of j.pairs) {
       const m = META[p.key]; if (!m) continue;
+      const cal = m.region === "ca" ? "ca" : "us";
       const bars = p.index.bars, last = bars[bars.length - 1];
       const lastDate = et(last.t * 1000).date;
-      const openNow = lastDate === n.date && n.mins >= 570 && n.mins < 960;
+      const closeM = closeMin(cal, n.date);
+      const openNow = isTradingDay(cal, n.date) && lastDate === n.date && n.mins >= 570 && n.mins < closeM;
       if (m.region !== "ca") marketOpen = marketOpen || openNow;
       const closeBar = openNow && bars.length > 1 ? bars[bars.length - 2] : last;
       const closeDate = et(closeBar.t * 1000).date;
-      const fRef = p.future.bars.find((b) => et(b.t * 1000).date === closeDate);
-      if (!fRef) throw new Error(`no ${m.fut} futures price for ${closeDate}`);
-      const fNow = p.future.price, fPts = fNow - fRef.close;
-      // Real futures: shift by the futures' point move. Proxy (Composite): apply the NQ percentage move.
-      const pct = m.proxy ? (fPts / fRef.close) * 100 : (fPts / closeBar.close) * 100;
-      const pts = m.proxy ? closeBar.close * pct / 100 : fPts, implied = closeBar.close + pts;
+      // Futures at that close: Yahoo's daily futures close, except where the relay sends the price at the
+      // index's actual close time (1 p.m. early closes, and US holidays on which the TSX traded).
+      const ref = (p.future.refs || {})[closeDate];
+      const fBar = p.future.bars.find((b) => et(b.t * 1000).date === closeDate);
+      const fRef = ref ? ref.close : fBar ? fBar.close : null;
+      const fNow = p.future.price;
+      let pts = null, pct = null, implied = null;
+      if (fRef != null) {
+        const fPts = fNow - fRef;
+        // Real futures: shift by the futures' point move. Proxy (Composite, TSX): apply the futures' percentage move.
+        pct = m.proxy ? (fPts / fRef) * 100 : (fPts / closeBar.close) * 100;
+        pts = m.proxy ? closeBar.close * pct / 100 : fPts; implied = closeBar.close + pts;
+      }
       newestFut = Math.max(newestFut, p.future.time * 1000);
-      results.push({ k: p.key, m, close: closeBar.close, closeDate, fRef: fRef.close, fNow, pts, implied, pct, openNow, todayOpen: openNow ? last.open : null });
+      const target = targetOf(cal, n);
+      results.push({ k: p.key, m, cal, close: closeBar.close, closeDate, fRef, fNow, pts, implied, pct, openNow, target, todayOpen: openNow ? last.open : null });
 
-      $(`cl-${p.key}`).textContent = `Last close (${dateLabel(closeDate)})`;
+      const fName = m.proxy ? m.fut + " futures" : "Futures";
+      $(`cl-${p.key}`).textContent = `Last close (${dateLabel(closeDate)}${closeMin(cal, closeDate) === 780 ? ", 1 p.m. early close" : ""})`;
       $(`close-${p.key}`).textContent = fmt(closeBar.close);
-      $(`fref-${p.key}`).textContent = fmt(fRef.close);
+      // Normally the price exactly at the close time (e.g. 1 p.m.); after a US holiday the TSX gets the last price before it.
+      const refAt = ref ? et(ref.time * 1000) : null;
+      $(`frl-${p.key}`).textContent = !ref ? `${fName} at that close`
+        : refAt.date === closeDate && refAt.mins === closeMin(cal, closeDate) ? `${fName} at that close (${etLabel(ref.time * 1000, false)})`
+        : `${fName}, last price before that close (${etLabel(ref.time * 1000)})`;
+      $(`fref-${p.key}`).textContent = fRef == null ? "unavailable" : fmt(fRef);
       $(`fnow-${p.key}`).textContent = fmt(fNow);
-      if (openNow && last.open) {
-        const oPts = last.open - closeBar.close, oPct = (oPts / closeBar.close) * 100;
-        const oDir = Math.abs(oPct) < 0.005 ? "flat" : oPts > 0 ? "up" : "down";
-        $(`lab-${p.key}`).textContent = "Opened today at";
-        $(`open-${p.key}`).textContent = fmt(last.open);
-        $(`chg-${p.key}`).className = "pill" + (oDir === "flat" ? "" : " " + oDir);
-        $(`chg-${p.key}`).textContent = `${sign(oPts)}${fmt(Math.abs(oPts), 1)} pts  ${sign(oPct)}${fmt(Math.abs(oPct), 2)}%`;
-        $(`plain-${p.key}`).textContent = `The ${m.short} opened ${fmt(Math.abs(oPct), 2)}% ${oDir === "up" ? "above" : "below"} its ${dateLabel(closeDate)} close. The next estimate starts after today's 4 p.m. Eastern close.`;
+
+      if (openNow) {
+        const a = p.index.at931;
+        const base = closeBar.close;
+        if (a && a.final) {
+          // The index level after the first full minute of trading (close of the 9:30 one-minute bar).
+          const oPts = a.close - base, oPct = (oPts / base) * 100;
+          const oDir = setPill(p.key, oPts, oPct);
+          $(`lab-${p.key}`).textContent = "Level at 9:31";
+          $(`open-${p.key}`).textContent = fmt(a.close);
+          $(`plain-${p.key}`).textContent = `After its first full minute of trading, the ${m.short} stood ${oDir === "flat" ? "about level with" : fmt(Math.abs(oPct), 2) + "% " + (oDir === "up" ? "above" : "below")} its ${dateLabel(closeDate)} close. The next estimate starts after today's ${closeLabel(cal, n.date)} Eastern close.`;
+        } else if ("at931" in p.index && n.mins < 576) {
+          // 9:30 until the first minute is over (the relay says when): show the last estimate meanwhile.
+          if (m.region !== "ca") opening = true;
+          $(`lab-${p.key}`).textContent = "Opening now · last estimate";
+          $(`open-${p.key}`).textContent = implied == null ? "—" : fmt(implied);
+          if (implied == null) { $(`chg-${p.key}`).className = "pill"; $(`chg-${p.key}`).textContent = "—"; } else setPill(p.key, pts, pct);
+          $(`plain-${p.key}`).textContent = `The market opened at 9:30. The ${m.short}'s level at 9:31, after its first full minute of trading, will show here in a moment. Until then this is the last estimate.`;
+        } else {
+          // No 9:31 level from Yahoo: fall back to the first printed open.
+          if (m.region !== "ca") firstPrint = true;
+          const oPts = last.open - base, oPct = (oPts / base) * 100;
+          const oDir = setPill(p.key, oPts, oPct);
+          $(`lab-${p.key}`).textContent = "Opened today at";
+          $(`open-${p.key}`).textContent = fmt(last.open);
+          $(`plain-${p.key}`).textContent = `The ${m.short} opened ${oDir === "flat" ? "about level with" : fmt(Math.abs(oPct), 2) + "% " + (oDir === "up" ? "above" : "below")} its ${dateLabel(closeDate)} close. This is the first printed level, which can lag the real move because not every stock has traded at 9:30; the 9:31 level isn't available right now. The next estimate starts after today's ${closeLabel(cal, n.date)} Eastern close.`;
+        }
         continue;
       }
-      const dir = Math.abs(pct) < 0.005 ? "flat" : pts > 0 ? "up" : "down";
-      $(`lab-${p.key}`).textContent = "Implied open";
+      if (fRef == null) {
+        $(`lab-${p.key}`).textContent = "Implied open";
+        $(`open-${p.key}`).textContent = "—";
+        $(`chg-${p.key}`).className = "pill"; $(`chg-${p.key}`).textContent = "—";
+        $(`plain-${p.key}`).textContent = `Yahoo isn't supplying the ${m.fut} futures price at the ${dateLabel(closeDate)} close right now, so there's no estimate for the ${m.short}. The page tries again every minute.`;
+        continue;
+      }
+      const dir = setPill(p.key, pts, pct);
+      const nextOpen = target === n.date ? "" : ` (next open: ${dateLabel(target)})`;
+      $(`lab-${p.key}`).textContent = "Implied open" + nextOpen;
       $(`open-${p.key}`).textContent = fmt(implied);
-      $(`chg-${p.key}`).className = "pill" + (dir === "flat" ? "" : " " + dir);
-      $(`chg-${p.key}`).textContent = `${sign(pts)}${fmt(Math.abs(pts), 1)} pts  ${sign(pct)}${fmt(Math.abs(pct), 2)}%`;
       $(`plain-${p.key}`).textContent = m.proxy
         ? `${m.note(sign(pct) + fmt(Math.abs(pct), 2) + "%")} It points to the ${m.short} opening about ${fmt(Math.abs(pct), 2)}% ${pct >= 0 ? "higher" : "lower"}.`
         : dir === "flat"
@@ -231,14 +324,15 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     }
 
     // Headline and explanation
-    const all = results.filter((r) => r.m.region !== "ca");
-    const core = results.filter((r) => !r.m.proxy);
+    const all = results.filter((r) => r.m.region !== "ca" && r.pct != null);
+    const core = results.filter((r) => !r.m.proxy && r.pct != null);
     const ups = core.filter((r) => r.pct >= 0.05), downs = core.filter((r) => r.pct <= -0.05);
     const sorted = [...core].sort((a, b) => a.pct - b.pct);
     const n3 = core.length;
     const list = (rs) => rs.map((r) => `${r.m.short} ${sign(r.pct)}${fmt(Math.abs(r.pct), 2)}%`).join(", ");
     let head;
-    if (marketOpen) head = "The market is open. Here's how each index opened today.";
+    if (marketOpen) head = opening ? "The market has just opened." : firstPrint ? "The market is open. Here's how each index opened today." : "The market is open. Here's where each index stood at 9:31.";
+    else if (!n3) head = "Futures prices for the estimate aren't available right now.";
     else if (downs.length === n3) head = `Futures point to a lower open across the board.`;
     else if (ups.length === n3) head = `Futures point to a higher open across the board.`;
     else if (!ups.length && !downs.length) head = `Futures point to a roughly flat open.`;
@@ -247,17 +341,20 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     else head = `Futures point to a mixed open.`;
     $("headline").textContent = head;
 
-    const big = Math.max(...core.map((r) => Math.abs(r.pct)));
-    let ex = marketOpen ? "" : `${list(all)}. `;
+    const big = n3 ? Math.max(...core.map((r) => Math.abs(r.pct))) : 0;
+    let ex = marketOpen || !all.length ? "" : `${list(all)}. `;
+    const ndx = core.find((r) => r.k === "ndx"), dji = core.find((r) => r.k === "dji");
     if (!marketOpen && n3 >= 2) {
       const weakest = sorted[0], strongest = sorted[sorted.length - 1];
       if (downs.length === n3) ex += `Of the three with their own futures, the ${weakest.m.short} is set to fall the most and the ${strongest.m.short} the least. `;
       else if (ups.length === n3) ex += `Of the three with their own futures, the ${strongest.m.short} is set to gain the most and the ${weakest.m.short} the least. `;
       ex += `Overall this is ${sizeWord(big)}.`;
-      if (results.find((r) => r.k === "ndx") && Math.abs(results.find((r) => r.k === "ndx").pct) > Math.abs(results.find((r) => r.k === "dji").pct) * 1.5 && big >= 0.3)
+      if (ndx && dji && Math.abs(ndx.pct) > Math.abs(dji.pct) * 1.5 && big >= 0.3)
         ex += ` The Nasdaq-100 moving most usually means technology stocks are leading the move.`;
     } else if (marketOpen) {
-      ex += `This page estimates the open before trading starts. Come back after the 4 p.m. Eastern close for the next trading day's estimate. It becomes most useful in the hour before 9:30 a.m.`;
+      ex += opening
+        ? `At 9:30:00 many stocks haven't traded yet, so the first printed index levels can lag. The level at 9:31, after the first full minute, gives a fuller picture and appears here in a moment.`
+        : `This page estimates the open before trading starts. Come back after the ${closeLabel("us", n.date)} Eastern close for the next trading day's estimate. It becomes most useful in the hour before 9:30 a.m.`;
     }
     $("explain").textContent = ex;
 
@@ -269,13 +366,22 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
       $("feed").hidden = false;
       $("feed").textContent = `Data problem: Yahoo isn't supplying the futures contract this page normally uses (${fb.join(", ")}), so it's using Yahoo's general futures price instead. That's usually fine, but in the week around a quarterly futures expiry (the third Friday of March, June, September and December) it can make estimates about 1% too high${expiryWeek(n.date) ? ", and this is one of those weeks, so treat today's estimates as unreliable" : ""}. The page tries again every minute and this note disappears once Yahoo is back. If it's still here a day later, it needs fixing.`;
     } else $("feed").hidden = true;
+    // Holidays and early closes, in plain words.
+    const usTarget = targetOf("us", n);
+    let calNote = "";
+    if (CAL.us.closed[n.date]) calNote = `US markets are closed today for ${CAL.us.closed[n.date]}. `;
+    else if (CAL.us.early[n.date] && n.mins >= 780) calNote = `US markets closed early today, at 1 p.m. Eastern (${CAL.us.early[n.date]}), so the estimates are for the next open. `;
+    else if (CAL.us.early[n.date]) calNote = `US markets close early today, at 1 p.m. Eastern (${CAL.us.early[n.date]}). `;
+    const later = holidaysBefore("us", n, usTarget).filter((d) => d !== n.date);
+    if (later.length) calNote += `US markets are ${CAL.us.closed[n.date] ? "also " : ""}closed ${later.map((d) => `${dateLabel(d)} for ${CAL.us.closed[d]}`).join(" and ")}. `;
+    const nextTxt = `The next open is ${usTarget === n.date ? "today" : dateLabel(usTarget)} at 9:30 a.m. Eastern.`;
     const futAgeMin = (now - newestFut) / 60000;
     t.hidden = false; t.className = "note";
-    if (marketOpen) { t.hidden = true; }
-    else if (futAgeMin > 30) { t.className = "note warn"; t.textContent = `Futures aren't trading right now (they pause 5–6 p.m. Eastern on weekdays and from Friday 5 p.m. to Sunday 6 p.m.). Showing the last prices, from ${etLabel(newestFut)}.`; }
-    else if (mins != null && mins <= 30) t.textContent = `The market opens in ${mins} minute${mins === 1 ? "" : "s"}. This close to the open, the estimate is usually reliable.`;
-    else if (mins != null) { t.className = "note warn"; t.textContent = `The market opens in ${Math.floor(mins / 60)} h ${mins % 60} min. Estimates this early often change. They become more reliable after about 8 a.m. Eastern, and most reliable in the last few minutes before 9:30.`; }
-    else { t.className = "note warn"; t.textContent = `The next open is the next trading day at 9:30 a.m. Eastern. Overnight estimates often change, so check again closer to the open.`; }
+    if (marketOpen) { t.hidden = !calNote; t.textContent = calNote.trim(); }
+    else if (futAgeMin > 30) { t.className = "note warn"; t.textContent = `${calNote}Futures aren't trading right now (they pause 5–6 p.m. Eastern on weekdays, from Friday 5 p.m. to Sunday 6 p.m., and around market holidays). Showing the last prices, from ${etLabel(newestFut)}. ${nextTxt}`; }
+    else if (mins != null && mins <= 30) t.textContent = `${calNote}The market opens in ${mins} minute${mins === 1 ? "" : "s"}. This close to the open, the estimate is usually reliable.`;
+    else if (mins != null) { t.className = "note warn"; t.textContent = `${calNote}The market opens in ${Math.floor(mins / 60)} h ${mins % 60} min. Estimates this early often change. They become more reliable after about 8 a.m. Eastern, and most reliable in the last few minutes before 9:30.`; }
+    else { t.className = "note warn"; t.textContent = `${calNote}${nextTxt} Overnight estimates often change, so check again closer to the open.`; }
 
     $("meta").innerHTML = `<span>Futures prices as of ${etLabel(newestFut)} (about 10 minutes delayed)</span><span>Updated ${etLabel(now)}</span><span>Sources: Yahoo Finance, Bank of Canada</span>`;
     renderCanada(j, results.find((r) => r.k === "tsx"));
@@ -321,7 +427,16 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     else comTxt = `Commodities are mixed: ${names(upL)} up, ${names(dnL)} down.`;
 
     if (!tsx) { $("ca-headline").textContent = "TSX prices couldn't be loaded."; $("ca-explain").textContent = comTxt; return; }
-    if (tsx.openNow) { $("ca-headline").textContent = "The TSX is open."; $("ca-explain").textContent = comTxt + " Come back after the 4 p.m. Eastern close for the next estimate."; return; }
+    // Holidays: the TSX follows Canada's market calendar, which differs from the US one.
+    const n = et(j.fetchedAt);
+    let calTxt = "";
+    if (CAL.ca.closed[n.date]) calTxt = ` The TSX is closed today for ${CAL.ca.closed[n.date]}, so this is for its next open, ${dateLabel(tsx.target)}.`;
+    else if (CAL.ca.early[n.date] && n.mins >= 780 && !tsx.openNow) calTxt = ` The TSX closed early today, at 1 p.m. Eastern (${CAL.ca.early[n.date]}), so this is for its next open, ${dateLabel(tsx.target)}.`;
+    else if (CAL.us.closed[n.date] && isTradingDay("ca", n.date) && !tsx.openNow) calTxt = ` US markets are closed today for ${CAL.us.closed[n.date]}, but the TSX is open. Yahoo shows no US futures trading on US holidays, so the stand-in uses the last futures price from before the holiday.`;
+    const later = holidaysBefore("ca", n, tsx.target).filter((d) => d !== n.date);
+    if (later.length) calTxt += ` The TSX is ${CAL.ca.closed[n.date] ? "also " : ""}closed ${later.map((d) => `${dateLabel(d)} for ${CAL.ca.closed[d]}`).join(" and ")}.`;
+    if (tsx.openNow) { $("ca-headline").textContent = "The TSX is open."; $("ca-explain").textContent = comTxt + ` Come back after the ${closeLabel("ca", n.date)} Eastern close for the next estimate.` + calTxt; return; }
+    if (tsx.pct == null) { $("ca-headline").textContent = "There's no TSX estimate right now."; $("ca-explain").textContent = comTxt + calTxt; return; }
     const usDir = tsx.pct >= 0.05 ? "higher" : tsx.pct <= -0.05 ? "lower" : "flat";
     const comDir = upC > dnC ? "higher" : dnC > upC ? "lower" : "none";
     $("ca-headline").textContent = usDir === "flat" ? "US futures point to a roughly flat TSX open." : `US futures point to a ${usDir} TSX open, about ${fmt(Math.abs(tsx.pct), 2)}%.`;
@@ -330,7 +445,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     else if (comDir === usDir) tail = "That points the same way as US futures, which makes the estimate's direction more convincing.";
     else if (usDir === "lower") tail = "That pulls against the weak US futures, so the TSX may hold up better than the estimate suggests.";
     else tail = "That pulls against the strong US futures, so the TSX may lag what the estimate suggests.";
-    $("ca-explain").textContent = `${comTxt} ${tail}`;
+    $("ca-explain").textContent = `${comTxt} ${tail}${calTxt}`;
   }
 
   async function load() {

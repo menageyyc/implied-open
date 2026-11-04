@@ -1,5 +1,6 @@
 -- Accuracy tracker: database setup on Supabase project "Menage" (applied 2026-11-04 as
--- migrations implied_open_accuracy and implied_open_summary_roll_flag). Kept here for reference
+-- migrations implied_open_accuracy, implied_open_summary_roll_flag, implied_open_price_931 and
+-- implied_open_summary_931). Kept here for reference
 -- and for rebuilding. The edge function is supabase/functions/implied-open-accuracy/index.ts.
 --
 -- Secrets live in Supabase Vault (values are NOT in this repo):
@@ -32,6 +33,7 @@ create table implied_open.actuals (
   prev_close numeric,                 -- previous trading day's close
   open_official numeric,              -- the index's first printed (official) open
   price_935 numeric,                  -- index level at 9:35 a.m. ET (close of the 9:30-9:35 five-minute bar)
+  -- price_931 numeric                 -- added later, see the end of this file
   updated_at timestamptz not null default now(),
   primary key (trade_date, key)
 );
@@ -54,11 +56,16 @@ language sql immutable set search_path = '' as $$
 $$;
 
 -- One JSON document with everything the accuracy page draws.
+-- Comparisons: _o = official (first printed) open, _p = price at 9:35, _m = level at 9:31 (the 9:30
+-- one-minute bar's close), falling back to 9:35 on days with no 9:31 level (before 2026-10-06; Yahoo
+-- keeps 1-minute data only ~30 days). n_m931 counts the rows that had a real 9:31 level.
+-- In "daily", m is the raw 9:31 level (null where there's none).
 create or replace function implied_open.summary() returns jsonb
 language sql stable set search_path = '' as $$
 with j as (
   select s.key, s.target_date, s.horizon_min, s.implied, s.prev_close, s.source,
          a.open_official as o, a.price_935 as p, a.prev_close as a_prev,
+         a.price_931 as m931, coalesce(a.price_931, a.price_935) as m,  -- 9:31 level; 9:35 where there's none
          implied_open.is_roll_day(s.target_date) as roll
   from implied_open.snapshots s
   join implied_open.actuals a on a.trade_date = s.target_date and a.key = s.key
@@ -72,12 +79,16 @@ curve as (
     count(p) as n_p,
     sum(abs(implied - p) / p * 100) as se_p, sum(abs(prev_close - p) / p * 100) as sb_p,
     sum(case when p is null then 0 when sign(implied - prev_close) = sign(p - prev_close) then 1 else 0 end) as sh_p,
-    sum(case when p is null then 0 when abs(implied - p) < abs(prev_close - p) then 1 else 0 end) as sw_p
+    sum(case when p is null then 0 when abs(implied - p) < abs(prev_close - p) then 1 else 0 end) as sw_p,
+    count(m) as n_m, count(m931) as n_m931,
+    sum(abs(implied - m) / m * 100) as se_m, sum(abs(prev_close - m) / m * 100) as sb_m,
+    sum(case when m is null then 0 when sign(implied - prev_close) = sign(m - prev_close) then 1 else 0 end) as sh_m,
+    sum(case when m is null then 0 when abs(implied - m) < abs(prev_close - m) then 1 else 0 end) as sw_m
   from j group by key, horizon_min, not roll
 ),
 daily as (
   select key, target_date, bool_or(roll) as roll,
-    max(o) as o, max(p) as p, max(prev_close) as prev_close,
+    max(o) as o, max(p) as p, max(m931) as m, max(prev_close) as prev_close,
     bool_or(source = 'live') as live,
     jsonb_object_agg(horizon_min, round(implied, 2)) filter (where horizon_min in (0, 10, 20, 30, 60, 120, 240, 480)) as est
   from j group by key, target_date
@@ -87,9 +98,11 @@ select jsonb_build_object(
   'lastLogged', (select max(logged_at) from implied_open.snapshots),
   'lastLive', (select max(data_time) from implied_open.snapshots where source = 'live'),
   'closeMismatches', (select count(*) from j where a_prev is not null and abs(a_prev - prev_close) > 0.01),
+  -- Sums per (index, minutes before open, clean day or contract-switch day); the page adds and divides.
   'curve', coalesce((select jsonb_agg(jsonb_build_object('key', key, 'h', horizon_min, 'clean', clean, 'n', n,
       'se_o', round(se_o, 4), 'sb_o', round(sb_o, 4), 'sh_o', sh_o, 'sw_o', sw_o,
-      'n_p', n_p, 'se_p', round(se_p, 4), 'sb_p', round(sb_p, 4), 'sh_p', sh_p, 'sw_p', sw_p) order by key, horizon_min) from curve), '[]'::jsonb),
+      'n_p', n_p, 'se_p', round(se_p, 4), 'sb_p', round(sb_p, 4), 'sh_p', sh_p, 'sw_p', sw_p,
+      'n_m', n_m, 'n_m931', n_m931, 'se_m', round(se_m, 4), 'sb_m', round(sb_m, 4), 'sh_m', sh_m, 'sw_m', sw_m) order by key, horizon_min) from curve), '[]'::jsonb),
   'daily', coalesce((select jsonb_agg(to_jsonb(d) order by key, target_date) from daily d), '[]'::jsonb)
 );
 $$;
@@ -123,4 +136,6 @@ select cron.schedule('cron-run-log-cleanup', '17 8 * * *',
 -- 9:31 level (added 2026-11-04, migration implied_open_price_931): the fully formed open. The first
 -- printed open is partly built from previous closes (Dow captures ~50% of the real gap at 9:30:00).
 -- Filled for 2026-10-06 onward from Yahoo 1-minute bars (close of the 9:30 bar); earlier days have none.
+-- The logger saves it from then on (never overwriting a saved value with null). Run this before
+-- creating summary() above if rebuilding from scratch.
 alter table implied_open.actuals add column if not exists price_931 numeric;
