@@ -6,6 +6,7 @@ A single web page that estimates where the S&P 500, Nasdaq-100, Nasdaq Composite
 - `site/index.html`: the page.
 - `site/robots.txt`, `site/_headers`: keep search engines out. The page also carries a `noindex` meta tag.
 - `supabase/functions/implied-open/index.ts`: the data relay.
+- `private/`: Matt's login-protected version (https://implied-open-pvt.soesraider.com), a separate Cloudflare Pages project. It builds from `site/` and adds a TSX estimate from Montreal Exchange SXF futures. See HANDOFF.md, "Private SXF site".
 
 ## Where the data comes from
 Browsers can't read Yahoo Finance directly, so the page calls a small Supabase Edge Function:

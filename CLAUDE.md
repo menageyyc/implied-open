@@ -74,4 +74,5 @@ STANDING RULES COPIES
 - `site/` is the whole website (static files). `supabase/functions/implied-open/` is the source of the data relay deployed on Supabase project "Menage" (ref awagbieeouxxhytdhloi).
 - Keep the site non-crawlable: the noindex meta tag in index.html, plus robots.txt and _headers.
 - Changes to `site/` or the function are website changes: show Matt screenshots and get approval before merging.
+- `private/` is Matt's login-protected version (Cloudflare Pages project `implied-open-pvt`, behind Cloudflare Access). Montreal Exchange data must never be reachable without logging in: never put the MX fetch in `site/` or the Supabase function, and never create a top-level `functions/` folder.
 - If you redeploy the function, keep `verify_jwt: false` (the page calls it without a key) and keep the symbol list fixed, so it can't be used as an open proxy.
