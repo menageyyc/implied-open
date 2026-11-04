@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Implied Open Accuracy</title>
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="googlebot" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="description" content="How close the Implied Open estimates have come to the real 9:30 a.m. open.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600&display=swap">
+<style>
+/* Same look as the main page. Layout: header, controls, at-a-glance table, two charts, recent days, notes. */
+:root {
+  --bg: #f3f5f7; --panel: #ffffff; --ink: #14202b; --muted: #5b6875; --line: #d9dfe5;
+  --accent: #1f5f8b; --flat-bg: #e9edf1; --warn-bg: #fff4d6; --warn-ink: #7a5800;
+  --s1: #2a78d6; --s2: #eb6834; --grid: #e6e9ed; --axis: #c3c9cf; --muted-mark: #b9c1c9;
+  --display: "Fraunces", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f161d; --panel: #17212b; --ink: #e6ecf1; --muted: #93a1ae; --line: #2a3742;
+    --accent: #6fb0dd; --flat-bg: #22303c; --warn-bg: #3a3014; --warn-ink: #f2d27a;
+    --s1: #3987e5; --s2: #d95926; --grid: #24313c; --axis: #3a4855; --muted-mark: #4a5966; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 28px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 22px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
+h1 { font-family: var(--display); font-weight: 600; font-size: 2rem; line-height: 1.1; margin: 0; }
+h2 { font-family: var(--display); font-weight: 600; font-size: 1.3rem; line-height: 1.25; margin: 0; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 64ch; }
+a { color: var(--accent); }
+.back { font-weight: 500; text-decoration: none; padding: 10px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; }
+.back:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: grid; gap: 12px; min-width: 0; }
+.panel p { margin: 0; max-width: 75ch; }
+.muted { color: var(--muted); font-size: 0.88rem; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; background: var(--flat-bg); border-radius: 9px; }
+.seg button { font: 500 0.88rem var(--body); padding: 6px 11px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--panel); box-shadow: 0 0 0 1px var(--line); }
+.ctl-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-right: 6px; }
+label.check { display: inline-flex; gap: 8px; align-items: center; font-size: 0.9rem; cursor: pointer; }
+.note { padding: 10px 14px; border-radius: 8px; background: var(--flat-bg); font-size: 0.9rem; }
+.note.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { padding: 7px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-weight: 500; color: var(--muted); font-size: 0.78rem; vertical-align: bottom; white-space: normal; }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td:first-child { font-family: var(--body); }
+tr.hl td { font-weight: 500; }
+.tag { font: 500 0.7rem var(--body); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin-left: 6px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.85rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 18px; height: 0; border-top: 2px solid; display: inline-block; }
+.sw.box { width: 12px; height: 12px; border: 0; border-radius: 3px; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font: 11px var(--body); fill: var(--muted); }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; line-height: 1.45; box-shadow: 0 4px 14px rgba(0,0,0,0.12); min-width: 180px; max-width: 300px; z-index: 2; }
+.tip b { font-weight: 600; }
+.tip .r { display: flex; justify-content: space-between; gap: 12px; }
+.tip .r span:last-child { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.method { color: var(--muted); font-size: 0.88rem; display: grid; gap: 6px; max-width: 75ch; }
+.method h3 { color: var(--ink); font-size: 0.95rem; margin: 0; }
+.method p { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>How accurate is it?</h1>
+      <p class="sub">Every 5 minutes overnight, the Implied Open estimate is saved. After 9:30 a.m. Eastern it's compared with where each index actually opened.</p>
+    </div>
+    <a class="back" href="/">← Back to Implied Open</a>
+  </header>
+
+  <section class="panel">
+    <div class="controls">
+      <div><span class="ctl-label">Index</span><span class="seg" id="seg-key" role="group" aria-label="Index"></span></div>
+      <div><span class="ctl-label">Compare with</span><span class="seg" id="seg-cmp" role="group" aria-label="Compare with"></span></div>
+      <label class="check"><input type="checkbox" id="roll"> Include futures contract-switch days</label>
+    </div>
+    <div class="note" id="status">Loading results…</div>
+  </section>
+
+  <section class="panel">
+    <h2 id="glance-h">At a glance</h2>
+    <p class="muted" id="glance-sub"></p>
+    <div class="tablewrap"><table id="glance"></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>Average miss by time before the open</h2>
+    <p class="muted">How far the estimate was from the actual open, on average, depending on how early it was taken. Lower is better. The orange line is the simplest possible guess, "it opens where it closed yesterday", for comparison.</p>
+    <div class="legend"><span><i class="sw" style="border-color:var(--s1)"></i>Implied open estimate</span><span><i class="sw" style="border-color:var(--s2);border-top-style:dashed"></i>"No change" guess</span></div>
+    <div class="chart" id="curve"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Day by day</h2>
+    <div class="controls"><div><span class="ctl-label">Futures price at</span><span class="seg" id="seg-h" role="group" aria-label="Futures price time"></span></div></div>
+    <p class="muted">Each bar is one trading day: how far the estimate was above (bar up) or below (bar down) the actual open.</p>
+    <div class="legend" id="day-legend"></div>
+    <div class="chart" id="days"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Recent days</h2>
+    <div class="tablewrap"><table id="recent"></table></div>
+  </section>
+
+  <section class="method">
+    <h3>What's being measured</h3>
+    <p><strong>The estimate.</strong> Exactly the main page's calculation (last close + the futures move since that close), saved every 5 minutes from 6 p.m. Eastern the evening before until 9:30 a.m.</p>
+    <p><strong>Times are futures-price times.</strong> Yahoo's futures prices run about 10 minutes behind, so each estimate is filed under the time of the futures price it used, not the clock time. For example, the "9:20 a.m." estimate is what the page showed at about 9:30.</p>
+    <p><strong>The actual open.</strong> At 9:30:00 many stocks haven't made their first trade yet, so an index's official opening number is partly built from the previous day's prices and tends to understate the real move. That's why the default comparison is the index level at 9:35 a.m., when nearly every stock has traded. You can switch to the official open with "Compare with".</p>
+    <p><strong>The "no change" guess</strong> assumes the index opens exactly at the previous close. An estimate is only useful if it beats that.</p>
+    <p><strong>Rebuilt history.</strong> Days before Nov 4, 2026 were rebuilt from Yahoo's 5-minute futures history using the same formula (marked "rebuilt"). From Nov 4, 2026 on, the estimates are saved live as the page would show them.</p>
+    <p><strong>Futures contract-switch days.</strong> Each quarter (March, June, September, December) the futures roll to the next contract, which trades at a different price. For a few days around the switch Yahoo's data mixes the two contracts and the estimate can be off by close to 1%. Those days (Tuesday of expiry week through the following Monday) are left out of the averages unless you tick the box, and show in grey on the day-by-day chart.</p>
+    <p><strong>Holidays</strong> have no open, so they're simply skipped. Source: Yahoo Finance.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  const API = "https://awagbieeouxxhytdhloi.supabase.co/functions/v1/implied-open-accuracy";
+  const KEYS = [["spx", "S&P 500"], ["ndx", "Nasdaq-100"], ["ixic", "Nasdaq Composite"], ["dji", "Dow"], ["tsx", "S&P/TSX"]];
+  const CMP = [["p", "Price at 9:35"], ["o", "Official open"]];
+  const GLANCE = [480, 240, 30, 20, 10, 0];
+  const DAYH = [480, 240, 30, 20, 10];
+  const state = { key: "spx", cmp: "p", roll: false, h: 10, data: null };
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const sgn = (n) => (n > 0 ? "+" : n < 0 ? "−" : "");
+  const pct = (n, d = 2) => sgn(n) + fmt(Math.abs(n), d) + "%";
+  const dateLabel = (iso, opts) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", Object.assign({ month: "short", day: "numeric", timeZone: "UTC" }, opts || {}));
+  const keyName = () => KEYS.find((k) => k[0] === state.key)[1];
+  // Futures-price clock time for "h minutes before 9:30".
+  function clock(h) {
+    let m = 570 - h; if (m < 0) m += 1440;
+    const hr = Math.floor(m / 60), mi = m % 60, ap = hr >= 12 ? "p.m." : "a.m.", h12 = ((hr + 11) % 12) + 1;
+    return `${h12}:${String(mi).padStart(2, "0")} ${ap}`;
+  }
+  function before(h) {
+    if (h === 0) return "at the open";
+    if (h < 60) return `${h} min before`;
+    const hh = Math.floor(h / 60), mm = h % 60;
+    return mm ? `${hh} h ${mm} min before` : `${hh} h before`;
+  }
+  const shortH = (h) => (h >= 60 ? `${h / 60} h` : h === 0 ? "9:30" : `${h} min`);
+
+  function seg(id, items, cur, onPick) {
+    const el = $(id);
+    el.innerHTML = items.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${String(v) === String(cur)}">${t}</button>`).join("");
+    el.onclick = (e) => { const b = e.target.closest("button"); if (!b) return; onPick(b.dataset.v); };
+  }
+  function controls() {
+    seg("seg-key", KEYS, state.key, (v) => { state.key = v; draw(); });
+    seg("seg-cmp", CMP, state.cmp, (v) => { state.cmp = v; draw(); });
+    seg("seg-h", DAYH.map((h) => [h, clock(h)]), state.h, (v) => { state.h = +v; draw(); });
+    $("roll").checked = state.roll;
+  }
+  $("roll").addEventListener("change", (e) => { state.roll = e.target.checked; draw(); });
+
+  // ---- data helpers ----
+  const actualOf = (d) => (state.cmp === "p" ? d.p : d.o);
+  function days() {
+    return (state.data.daily || []).filter((d) => d.key === state.key && actualOf(d) != null).map((d) => ({ ...d, a: +actualOf(d), prev_close: +d.prev_close }));
+  }
+  function stats(rows, h) {
+    const r = rows.filter((d) => (state.roll || !d.roll) && d.est && d.est[h] != null);
+    if (!r.length) return null;
+    let e = 0, ep = 0, b = 0, hit = 0, beat = 0;
+    for (const d of r) {
+      const est = +d.est[h], miss = Math.abs(est - d.a), base = Math.abs(d.prev_close - d.a);
+      e += miss / d.a * 100; ep += miss; b += base / d.a * 100;
+      if (Math.sign(est - d.prev_close) === Math.sign(d.a - d.prev_close)) hit++;
+      if (miss < base) beat++;
+    }
+    return { n: r.length, mae: e / r.length, maePts: ep / r.length, base: b / r.length, hit: hit / r.length, beat: beat / r.length };
+  }
+  function curve() {
+    const s = state.cmp, by = new Map();
+    for (const c of state.data.curve || []) {
+      if (c.key !== state.key || (!state.roll && !c.clean)) continue;
+      const n = s === "p" ? c.n_p : c.n; if (!n) continue;
+      const a = by.get(c.h) || { h: c.h, n: 0, se: 0, sb: 0 };
+      a.n += n; a.se += +c["se_" + s]; a.sb += +c["sb_" + s]; by.set(c.h, a);
+    }
+    // Yahoo's 5-minute history has the odd missing bar; plot only times that have (nearly) every day, so each point averages the same days.
+    // The "no change" guess doesn't depend on the time, so it's one flat average over the counted days.
+    const all = [...by.values()], top = Math.max(0, ...all.map((a) => a.n));
+    const r = days().filter((d) => state.roll || !d.roll);
+    const base = r.length ? r.reduce((t, d) => t + Math.abs(d.prev_close - d.a) / d.a * 100, 0) / r.length : 0;
+    return all.filter((a) => a.n >= top * 0.9).map((a) => ({ h: a.h, n: a.n, mae: a.se / a.n, base })).sort((x, y) => y.h - x.h);
+  }
+
+  // ---- tooltip ----
+  function tipFor(box) {
+    let t = box.querySelector(".tip");
+    if (!t) { t = document.createElement("div"); t.className = "tip"; t.hidden = true; box.appendChild(t); }
+    return {
+      show(html, x, y) {
+        t.innerHTML = html; t.hidden = false;
+        const W = box.clientWidth, tw = t.offsetWidth, th = t.offsetHeight;
+        let left = x + 14; if (left + tw > W) left = x - tw - 14; if (left < 0) left = Math.max(0, W - tw);
+        t.style.left = left + "px"; t.style.top = Math.max(0, y - th - 10) + "px";
+      },
+      hide() { t.hidden = true; },
+    };
+  }
+  // Axis scale with round tick steps: returns [max, step], max = step * ticks.
+  function niceScale(v, ticks) { v = Math.max(v, 0.05); const raw = v / ticks, p = Math.pow(10, Math.floor(Math.log10(raw))); const step = [1, 2, 2.5, 5, 10].map((m) => m * p).find((x) => x >= raw); return [Math.ceil(v / step - 1e-9) * step, step]; }
+  const tickLabel = (v, step) => fmt(v, step < 0.1 ? 2 : step < 1 ? 1 : 0);
+  const svgEl = (w, h, inner) => `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img">${inner}</svg>`;
+
+  // ---- chart 1: average miss by horizon ----
+  function drawCurve() {
+    const box = $("curve"), pts = curve();
+    const W = Math.max(300, box.clientWidth), H = W < 520 ? 240 : 300;
+    const m = { l: 46, r: 16, t: 14, b: 34 }, pw = W - m.l - m.r, ph = H - m.t - m.b;
+    if (!pts.length) { box.innerHTML = `<p class="muted">No results yet.</p>`; return; }
+    const [ymax, ystep] = niceScale(Math.max(...pts.map((p) => Math.max(p.mae, p.base))) * 1.05, 4);
+    const x = (h) => m.l + (930 - h) / 930 * pw, y = (v) => m.t + ph - v / ymax * ph;
+    let g = "";
+    for (let v = 0; v <= ymax + 1e-9; v += ystep) { const yy = y(v); g += `<line x1="${m.l}" x2="${W - m.r}" y1="${yy}" y2="${yy}" stroke="${v === 0 ? "var(--axis)" : "var(--grid)"}" stroke-width="1"/><text x="${m.l - 6}" y="${yy + 4}" text-anchor="end">${tickLabel(v, ystep)}%</text>`; }
+    const ticks = W < 520 ? [930, 570, 210, 0] : [930, 750, 570, 390, 210, 0];
+    for (const h of ticks) g += `<text x="${x(h)}" y="${H - 12}" text-anchor="${h === 930 ? "start" : h === 0 ? "end" : "middle"}">${h === 0 ? "9:30" : clock(h).replace(":00", "")}</text>`;
+    const path = (k) => pts.map((p, i) => `${i ? "L" : "M"}${x(p.h).toFixed(1)},${y(p[k]).toFixed(1)}`).join("");
+    g += `<path d="${path("base")}" fill="none" stroke="var(--s2)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"/>`;
+    g += `<path d="${path("mae")}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>`;
+    for (const h of [480, 240, 30, 20, 10]) { const p = pts.find((q) => q.h === h); if (p) g += `<circle cx="${x(h)}" cy="${y(p.mae)}" r="4" fill="var(--s1)" stroke="var(--panel)" stroke-width="2"/>`; }
+    g += `<line id="cx" x1="0" x2="0" y1="${m.t}" y2="${m.t + ph}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>`;
+    g += `<rect x="${m.l}" y="${m.t}" width="${pw}" height="${ph}" fill="transparent" id="hit"/>`;
+    box.innerHTML = svgEl(W, H, g);
+    const tip = tipFor(box), svg = box.querySelector("svg"), cx = svg.querySelector("#cx");
+    const move = (ev) => {
+      const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width;
+      const h = Math.round((930 - (px - m.l) / pw * 930) / 5) * 5;
+      const p = pts.reduce((a, b) => (Math.abs(b.h - h) < Math.abs(a.h - h) ? b : a));
+      cx.setAttribute("x1", x(p.h)); cx.setAttribute("x2", x(p.h)); cx.setAttribute("visibility", "visible");
+      tip.show(`<b>Futures at ${clock(p.h)}</b> <span class="muted">(${before(p.h)})</span>
+        <div class="r"><span>Estimate missed by</span><span>${fmt(p.mae, 2)}%</span></div>
+        <div class="r"><span>"No change" missed by</span><span>${fmt(p.base, 2)}%</span></div>
+        <div class="r muted"><span>Days</span><span>${p.n}</span></div>`, x(p.h) * r.width / W, y(p.mae) * r.height / H);
+    };
+    svg.addEventListener("pointermove", move); svg.addEventListener("pointerdown", move);
+    svg.addEventListener("pointerleave", () => { tip.hide(); cx.setAttribute("visibility", "hidden"); });
+  }
+
+  // ---- chart 2: signed miss per day ----
+  function drawDays() {
+    const box = $("days"), h = state.h;
+    const rows = days().filter((d) => d.est && d.est[h] != null).map((d) => ({ ...d, est: +d.est[h], miss: (+d.est[h] - d.a) / d.a * 100 }));
+    $("day-legend").innerHTML = `<span><i class="sw box" style="background:var(--s1)"></i>Counted in the averages</span><span><i class="sw box" style="background:var(--muted-mark)"></i>Contract-switch day${state.roll ? "" : " (not counted)"}</span>`;
+    if (!rows.length) { box.innerHTML = `<p class="muted">No results yet.</p>`; return; }
+    const W = Math.max(300, box.clientWidth), H = W < 520 ? 220 : 260;
+    const m = { l: 46, r: 8, t: 12, b: 30 }, pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const [lim, lstep] = niceScale(Math.max(...rows.map((r) => Math.abs(r.miss))) * 1.05, 2);
+    const y = (v) => m.t + ph / 2 - v / lim * ph / 2, slot = pw / rows.length, bw = Math.max(1, slot - 2);
+    let g = "";
+    for (let v = -lim; v <= lim + 1e-9; v += lstep) { const vv = Math.abs(v) < 1e-9 ? 0 : v; g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(vv)}" y2="${y(vv)}" stroke="${vv === 0 ? "var(--axis)" : "var(--grid)"}"/><text x="${m.l - 6}" y="${y(vv) + 4}" text-anchor="end">${vv === 0 ? "0" : sgn(vv) + tickLabel(Math.abs(vv), lstep) + "%"}</text>`; }
+    let lastMonth = "", lastX = -99;
+    rows.forEach((r, i) => {
+      const x0 = m.l + i * slot + 1, top = Math.min(y(0), y(r.miss)), hgt = Math.max(1, Math.abs(y(r.miss) - y(0)));
+      const rad = Math.min(2, bw / 2, hgt / 2);
+      const col = r.roll ? "var(--muted-mark)" : "var(--s1)";
+      // rounded data end, square at the zero line
+      const up = r.miss >= 0;
+      const d = up
+        ? `M${x0},${y(0)}V${top + rad}Q${x0},${top} ${x0 + rad},${top}H${x0 + bw - rad}Q${x0 + bw},${top} ${x0 + bw},${top + rad}V${y(0)}Z`
+        : `M${x0},${y(0)}V${top + hgt - rad}Q${x0},${top + hgt} ${x0 + rad},${top + hgt}H${x0 + bw - rad}Q${x0 + bw},${top + hgt} ${x0 + bw},${top + hgt - rad}V${y(0)}Z`;
+      g += `<path d="${d}" fill="${col}"/>`;
+      const mo = r.target_date.slice(0, 7);
+      if (mo !== lastMonth && x0 - lastX >= 36) { lastMonth = mo; lastX = x0; g += `<text x="${x0}" y="${H - 10}">${dateLabel(r.target_date, { day: undefined, month: "short" }).split(" ")[0]}</text>`; }
+    });
+    g += `<rect x="${m.l}" y="${m.t}" width="${pw}" height="${ph}" fill="transparent"/>`;
+    box.innerHTML = svgEl(W, H, g);
+    const tip = tipFor(box), svg = box.querySelector("svg");
+    const move = (ev) => {
+      const rc = svg.getBoundingClientRect(), px = (ev.clientX - rc.left) * W / rc.width;
+      const i = Math.min(rows.length - 1, Math.max(0, Math.floor((px - m.l) / slot))), r = rows[i];
+      const pts = r.est - r.a;
+      tip.show(`<b>${dateLabel(r.target_date, { weekday: "short", year: "numeric" })}</b>${r.roll ? ` <span class="tag">contract switch</span>` : ""}${r.live ? "" : ` <span class="tag">rebuilt</span>`}
+        <div class="r"><span>Estimate at ${clock(h)}</span><span>${fmt(r.est)}</span></div>
+        <div class="r"><span>${state.cmp === "p" ? "Actual at 9:35" : "Official open"}</span><span>${fmt(r.a)}</span></div>
+        <div class="r"><span>Miss</span><span>${sgn(pts)}${fmt(Math.abs(pts), 1)} pts (${pct(r.miss)})</span></div>`, (m.l + (i + 0.5) * slot) * rc.width / W, y(Math.max(0, r.miss)) * rc.height / H);
+    };
+    svg.addEventListener("pointermove", move); svg.addEventListener("pointerdown", move);
+    svg.addEventListener("pointerleave", () => tip.hide());
+  }
+
+  // ---- tables ----
+  function drawGlance() {
+    const rows = days();
+    const counted = rows.filter((d) => state.roll || !d.roll).length;
+    $("glance-h").textContent = `At a glance: ${keyName()}`;
+    $("glance-sub").textContent = `${counted} trading day${counted === 1 ? "" : "s"} counted, compared with the ${state.cmp === "p" ? "index level at 9:35 a.m" : "official open"}${state.roll ? ", contract-switch days included" : ""}.`;
+    let html = `<thead><tr><th>Futures price at</th><th>Average miss</th><th>Average miss (points)</th><th>"No change" missed by</th><th>Right direction</th><th>Closer than "no change"</th></tr></thead><tbody>`;
+    for (const h of GLANCE) {
+      const s = stats(rows, h);
+      html += `<tr${h === 10 ? ' class="hl"' : ""}><td>${clock(h)} <span class="muted">(${before(h)})</span></td>` +
+        (s ? `<td>${fmt(s.mae, 2)}%</td><td>${fmt(s.maePts, s.maePts >= 100 ? 0 : 1)}</td><td>${fmt(s.base, 2)}%</td><td>${Math.round(s.hit * 100)}%</td><td>${Math.round(s.beat * 100)}%</td>` : `<td colspan="5" class="muted">not enough data</td>`) + `</tr>`;
+    }
+    $("glance").innerHTML = html + `</tbody>`;
+  }
+  function drawRecent() {
+    const rows = days().slice(-15).reverse();
+    const hs = [480, 240, 30, 20, 10];
+    let html = `<thead><tr><th>Day</th><th>Previous close</th>${hs.map((h) => `<th>Estimate at ${clock(h)}</th>`).join("")}<th>${state.cmp === "p" ? "Actual at 9:35" : "Official open"}</th><th>Miss at ${clock(10)}</th></tr></thead><tbody>`;
+    for (const d of rows) {
+      const e10 = d.est && d.est[10] != null ? +d.est[10] : null;
+      html += `<tr><td>${dateLabel(d.target_date, { weekday: "short" })}${d.roll ? `<span class="tag">switch</span>` : ""}${d.live ? "" : `<span class="tag">rebuilt</span>`}</td><td>${fmt(d.prev_close)}</td>` +
+        hs.map((h) => `<td>${d.est && d.est[h] != null ? fmt(+d.est[h]) : "—"}</td>`).join("") +
+        `<td>${fmt(d.a)}</td><td>${e10 == null ? "—" : `${sgn(e10 - d.a)}${fmt(Math.abs(e10 - d.a), 1)} (${pct((e10 - d.a) / d.a * 100)})`}</td></tr>`;
+    }
+    $("recent").innerHTML = html + `</tbody>`;
+  }
+
+  function draw() {
+    controls();
+    if (!state.data) return;
+    drawGlance(); drawCurve(); drawDays(); drawRecent();
+  }
+
+  async function load() {
+    try {
+      const res = await fetch(API, { cache: "no-store" });
+      if (!res.ok) throw new Error("the results service answered with an error (" + res.status + ")");
+      const j = await res.json(); if (j.error) throw new Error(j.error);
+      state.data = j;
+      const all = (j.daily || []);
+      const first = all.reduce((a, d) => (!a || d.target_date < a ? d.target_date : a), null);
+      const last = all.reduce((a, d) => (!a || d.target_date > a ? d.target_date : a), null);
+      const live = j.lastLive ? new Date(j.lastLive).toLocaleString("en-US", { timeZone: "America/New_York", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) + " ET" : null;
+      $("status").className = "note";
+      $("status").textContent = first
+        ? `Results cover ${dateLabel(first, { year: "numeric" })} to ${dateLabel(last, { year: "numeric" })}. ${live ? `Latest live snapshot: futures price from ${live}.` : "Live snapshots start with the next overnight session."} Times are Eastern.`
+        : "No results yet. The first comparison appears after the next 9:30 a.m. open.";
+      draw();
+    } catch (e) {
+      $("status").className = "note warn";
+      $("status").textContent = `Results couldn't be loaded right now (${e.message || "network error"}). Try again in a minute.`;
+    }
+  }
+  controls();
+  load();
+  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (state.data) { drawCurve(); drawDays(); } }, 150); });
+})();
+</script>
+</body>
+</html>
