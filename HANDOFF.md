@@ -1,6 +1,6 @@
 # Handoff
 
-_Last updated: 2026-11-04 (contract-switch fix live and merged, PR #17; next session: whole-project review)_
+_Last updated: 2026-11-04 (whole-project review started: free-tier check done, cleanup job added; methodology review next)_
 
 ## Start here (fresh session)
 - **Next session: Matt will ask two critical-analysis questions covering a review of the entire project.** Read this file, README.md and the code (`site/`, `private/`, `supabase/`) before answering. Matt flagged that one may need a higher Opus effort level: if a question needs deep judgment (e.g. method soundness, data reliability, security, legal exposure), say so and suggest raising the effort before answering rather than answering lightly.
@@ -9,7 +9,7 @@ _Last updated: 2026-11-04 (contract-switch fix live and merged, PR #17; next ses
 - **Private site:** https://implied-open-pvt.soesraider.com (Matt only, emailed-code login, 30-day sessions). Adds the Montreal Exchange SXF-based TSX estimate.
 - **Accuracy tracker (2026-11-04):** live at https://implied-open.soesraider.com/accuracy, approved and merged by Matt. The logger collects every 5 minutes. Matt wants to look at it live and may ask for changes. At his request the default comparison is the official open (9:35 price is the alternative). See "Accuracy tracker" below.
 - **Open items:**
-  0. **Futures contract-switch bug in the main page (found 2026-11-04):** around each quarterly expiry, Yahoo's `ES=F`/`NQ=F`/`YM=F` intraday price switches to the next contract days before the daily series does. The page then compares the new contract's price with the old contract's close, and the estimate runs about 0.8–1.1% too high. This happened Sep 15–21, 2026; next risk is about Dec 15–21, 2026 (December contract expires Fri Dec 18). Proposed fix, not yet built: use explicit contract symbols (e.g. `ESZ26.CME`) chosen by date, or take the reference price from the same intraday series. Matt approved fixing it (2026-11-04), to be done in a fresh session before Dec 15; show screenshots before merging as usual.
+  0. **Methodology review (Matt's question 2, scope agreed 2026-11-04):** formula vs professional fair value; futures reference timing (4:00 p.m. settlement vs later trading); what counts as "the actual open" (first print vs a later, fuller opening value — Matt wants this examined critically); Yahoo delay/staleness; Composite and TSX stand-ins; whether the tracker could flatter the page (45-day sample, rebuilt vs live, contract-switch days); holidays, half days, DST weeks. Answer in chat. Flag any part that should wait for more data. Run it at high/max effort.
   1. **Matt to send the permission email** to TMX Datalinx (marketdata@tmx.com), text in `notes/mx-permission-email.md` (already worded for a page that is live). Matt sends it himself; never send email on his behalf. If the Bourse says no, take the MX feed down (see "If the Bourse says no" below).
   2. **Evening check:** one weekday after 8 p.m. ET, confirm the private page's SXF number looks sensible (that m-x.ca's settlement has rolled to that day's). If it hasn't, widen the paused window in `private/sxf.js`.
   3. Optional, offered to Matt: "Sign in with Google" instead of the emailed code (needs a Google Cloud OAuth client, ~15 min with Matt). Optional: rename the Zero Trust team `small-credit-1e44`.
@@ -55,6 +55,12 @@ _Last updated: 2026-11-04 (contract-switch fix live and merged, PR #17; next ses
 - **Live at https://implied-open.soesraider.com** (hosted 2026-11-04). See "Hosting and deploys" below.
 - The old private Claude artifact version was deleted at Matt's request.
 - **Private SXF version (live 2026-11-04, approved by Matt):** https://implied-open-pvt.soesraider.com, login required. Matt logged in on his phone and confirmed live SXF numbers (so m-x.ca answers Cloudflare's servers). See "Private SXF site" below.
+
+## Free tier (checked 2026-11-04)
+- Supabase org "The House" is on the Free plan, which never charges; going over a limit means warnings/restrictions, not a bill. Cloudflare Pages/Access also free.
+- Usage then: database 27 MB of 500 MB; logger ~8,600 of 500,000 function calls a month; the main page adds one call a minute per visible open tab. The 546 errors seen during backfill are the per-call compute limit, not a monthly quota.
+- Growth: estimates ~54 MB/year. The cron run log was another ~75 MB/year, so a daily job `cron-run-log-cleanup` (08:17 UTC) now keeps only 7 days of it (in `supabase/accuracy.sql`). Optional later (Matt's call): thin snapshots older than a few months to every 30 minutes.
+- The Menage project is shared with Matt's other apps, which draw on the same limits.
 
 ## Accuracy tracker
 - **What:** a public page at `/accuracy` comparing saved estimates with the actual open, by index and by how early the estimate was taken. Charts: average miss by time before the open (vs the "no change" guess), signed miss per day, at-a-glance table, recent days.

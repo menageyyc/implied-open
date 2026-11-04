@@ -112,3 +112,10 @@ $$);
 -- Rebuilding history (one-off, already done 2026-11-04 for target dates 2026-08-26 to 2026-11-04):
 -- POST {"action":"backfill","key":"spx","from":"2026-10-01","to":"2026-10-15"} with the secret header,
 -- one index and about two weeks per call (bigger ranges hit the free plan's compute limit).
+
+-- Housekeeping (added 2026-11-04): pg_cron never clears its own run log, which would otherwise
+-- grow about 75 MB a year from the 5-minute tick alone and eventually fill the Free plan's 500 MB.
+-- Daily at 08:17 UTC, keep only the last 7 days. This applies to every cron job in the Menage
+-- project (they share the log), which is harmless: it's only a history of runs.
+select cron.schedule('cron-run-log-cleanup', '17 8 * * *',
+  $$delete from cron.job_run_details where end_time < now() - interval '7 days'$$);
