@@ -12,7 +12,7 @@ Transcribed from Matt's screenshot of the email. Subject: "RE: Permission reques
 > TMX Montréal Exchange
 
 ## What it means for this project (our reading, 2026-11-04)
-- Allowed: live and delayed SXF data, non-commercial, at https://implied-open.soesraider.com/ (that hostname only: not implied-open.pages.dev, not preview links, not a public supabase.co endpoint).
+- Allowed: live and delayed SXF data, non-commercial, for the Implied Open page at https://implied-open.soesraider.com/. **Matt's clarification (2026-11-04):** TMX meant the published page in question; development and preview pages we use in the background for this project are fine. Their concern is that we don't reuse the permission for other projects. So: never use MX data in any other project or site.
 - Condition: blocks on web crawlers and scrapers must be enforced on the page (the sentence literally says "use of ... are enforced"; read as "restrictions on"). Keep noindex / robots.txt / X-Robots-Tag, and add scraper protection for the SXF data (see HANDOFF "Build brief: SXF on the public site").
 - Never sell MX data. No attribution wording was required; we credit the Montréal Exchange anyway.
 - Logging SXF for the /accuracy page: read as covered (it's for that page, and only derived estimates/misses are shown publicly). Matt said yes on 2026-11-04. If certainty is wanted, a one-line reply to Henri settles it.
