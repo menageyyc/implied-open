@@ -134,7 +134,7 @@ tr.hl td { font-weight: 500; }
 <script>
 (function () {
   const API = "https://awagbieeouxxhytdhloi.supabase.co/functions/v1/implied-open-accuracy";
-  const KEYS = [["spx", "S&P 500"], ["ndx", "Nasdaq-100"], ["ixic", "Nasdaq Composite"], ["dji", "Dow"], ["tsx", "S&P/TSX"]];
+  const KEYS = [["spx", "S&P 500"], ["ndx", "Nasdaq-100"], ["ixic", "Nasdaq Composite"], ["dji", "Dow"], ["rut", "Russell 2000"], ["tsx", "S&P/TSX"]];
   // m = level at 9:31 (close of the first full minute), p = price at 9:35, o = official (first printed) open.
   // The TSX opens more slowly, so it defaults to 9:35; the US indexes default to 9:31.
   const CMP = [["m", "Level at 9:31"], ["p", "Price at 9:35"], ["o", "Official open"]];

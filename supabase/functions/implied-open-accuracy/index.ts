@@ -22,9 +22,10 @@ const PAIRS = [
   { key: "ndx", index: "^NDX", future: "NQ", proxy: false, cal: "us" },
   { key: "ixic", index: "^IXIC", future: "NQ", proxy: true, cal: "us" },
   { key: "dji", index: "^DJI", future: "YM", proxy: false, cal: "us" },
+  { key: "rut", index: "^RUT", future: "RTY", proxy: false, cal: "us" },
   { key: "tsx", index: "^GSPTSE", future: "ES", proxy: true, cal: "ca" },
 ] as const;
-const EXCHANGE: Record<string, string> = { ES: "CME", NQ: "CME", YM: "CBT" };
+const EXCHANGE: Record<string, string> = { ES: "CME", NQ: "CME", YM: "CBT", RTY: "CME" };
 type Pair = typeof PAIRS[number];
 
 const OPEN_MIN = 570; // 9:30 a.m.
