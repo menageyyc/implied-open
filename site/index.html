@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600&display=swap">
 <style>
 /* Layout: headline summary band, five US index cards (3 + 2 on wide screens, 2-1-2 on tablets, stacked on phones),
-   a compact overnight-context strip, the Canada section, then a short "how to read this" note. */
+   a compact overnight-context strip, the Canada section, then the links to /explain and /accuracy and a one-line footer. */
 :root {
   --bg: #f3f5f7; --panel: #ffffff; --ink: #14202b; --muted: #5b6875; --line: #d9dfe5;
   --accent: #1f5f8b; --up: #1d7a4f; --up-bg: #e3f3ea; --down: #b2362b; --down-bg: #f9e5e2;
@@ -50,7 +50,7 @@ button:disabled { opacity: 0.6; cursor: wait; }
 @media (min-width: 900px) { #cards { grid-template-columns: repeat(6, 1fr); } #cards > .card { grid-column: span 2; } #cards > .card:nth-child(n+4) { grid-column: span 3; } }
 .ctx { display: grid; gap: 10px; }
 .links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.links a { display: grid; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; text-decoration: none; color: var(--ink); }
+.links a { display: grid; gap: 2px; align-content: start; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; text-decoration: none; color: var(--ink); }
 .links a:hover { border-color: var(--accent); }
 .links a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .links strong { color: var(--accent); font-weight: 600; }
@@ -76,9 +76,7 @@ button:disabled { opacity: 0.6; cursor: wait; }
 dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; border-top: 1px solid var(--line); padding-top: 10px; font-size: 0.85rem; }
 dt { color: var(--muted); }
 dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.method { color: var(--muted); font-size: 0.88rem; display: grid; gap: 6px; max-width: 75ch; }
-.method h3 { color: var(--ink); font-size: 0.95rem; margin: 0; }
-.method p { margin: 0; }
+.foot { color: var(--muted); font-size: 0.85rem; margin: 0; max-width: 75ch; }
 .section-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 8px 0 -8px; }
 .section-h h2 { font-family: var(--display); font-weight: 600; font-size: 1.35rem; margin: 0; }
 .section-h p { margin: 0; color: var(--muted); font-size: 0.88rem; }
@@ -115,11 +113,6 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     <ul class="ctx-grid" id="ctx"></ul>
   </section>
 
-  <nav class="links" aria-label="More">
-    <a href="/explain"><strong>How it works →</strong><span>The method in plain words, and how accurate it is</span></a>
-    <a href="/accuracy"><strong>Track record →</strong><span>Every past estimate against the real open</span></a>
-  </nav>
-
   <div class="section-h"><h2>Canada</h2><p>The TSX opens at 9:30 a.m. Eastern too.</p></div>
   <section class="summary" aria-live="polite">
     <h2 id="ca-headline">Loading Canadian prices…</h2>
@@ -133,17 +126,12 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     </article>
   </div>
 
-  <section class="method">
-    <h3>How to read this</h3>
-    <p><strong>What "implied open" means.</strong> The stock market is closed overnight, but futures on the S&amp;P 500, Nasdaq-100, Dow and Russell 2000 trade almost around the clock. However far a futures contract has moved since the market closed at 4 p.m. Eastern, the index is expected to open roughly that far up or down. Implied open = last close + that futures move.</p>
-    <p><strong>It gets more accurate closer to the open.</strong> Overnight trading is light, so prices drift and can swing on little news. More traders join from about 8 a.m. Eastern, and economic reports often come out at 8:30 a.m. An estimate taken a few minutes before 9:30 is usually much closer to the real open than one taken the night before.</p>
-    <p><strong>After the open.</strong> From 9:30 each card shows where the index actually opened: its level at 9:31, after the first full minute of trading. The very first printed level often lags the real move, because at 9:30:00 many stocks haven't traded yet and the index still counts them at yesterday's prices. For a minute or so after 9:30, while that first minute plays out, the card keeps showing the last estimate.</p>
-    <p><strong>Holidays and early closes.</strong> The page knows the US and Canadian market holidays and 1 p.m. early closes through 2027, so on a holiday or the evening before one it estimates the next real open, and the TSX card follows Canada's calendar. After a 1 p.m. close, "futures at that close" is the futures price at 1 p.m., when stocks stopped trading (futures carry on until 1:15).</p>
-    <p><strong>Limits.</strong> It's an estimate, not a forecast or advice. Prices come from Yahoo Finance's free feed, where futures prices run about 10 minutes behind and which isn't officially supported. Futures used: E-mini S&amp;P 500 (ES), E-mini Nasdaq-100 (NQ), Mini Dow (YM), E-mini Russell 2000 (RTY). The Nasdaq Composite has no futures of its own, so it borrows the NQ percentage move. The page refreshes itself every minute.</p>
-    <p><strong>Overnight context.</strong> The strip under the index cards shows what else has moved since the last US close (4 p.m. Eastern, or 1 p.m. on an early-close day): the VIX (how big a swing traders expect in the S&amp;P 500 over the next month; it's calculated from about 3:15 a.m. Eastern), the US 10-year Treasury yield, the US dollar against major currencies, European stocks, Brent crude and copper. It helps explain why futures moved, but none of it is used in the estimates. The 10-year yield on Yahoo only updates from about 8:20 a.m. Eastern; before that the tile shows the yield at the close and which way 10-year Treasury futures have moved since (futures up means yields down). Europe's stock markets trade from about 3 a.m. to 11:30 a.m. Eastern, so their change is from their own previous close. Source: Yahoo Finance.</p>
-    <p><strong>Track record.</strong> <a href="/accuracy">See how close past estimates came to the real open</a>, by index and by how early the estimate was taken.</p>
-    <p><strong>Canada.</strong> Canadian index futures (TSX 60, traded on the Montreal Exchange) have no free public feed, so the TSX estimate borrows the S&amp;P 500 futures move. That makes it the roughest number on the page. The TSX usually moves in the same direction as the S&amp;P, but it leans much more on banks, energy and mining, so check the drivers. Oil, natural gas, gold and the Canadian dollar come from Yahoo Finance; like the overnight context strip, their change is measured since the last US close. The Government of Canada 10-year bond yield comes from the Bank of Canada and is updated once a day, so it shows the latest published close, not an overnight move. Western Canadian Select (WCS), Alberta's heavy oil, has no free live price: the figure shown is the monthly average published by the Government of Alberta (Economic Dashboard), about a month behind, with WTI's average for the same month. It's background for Alberta readers, not an official version of the Government of Alberta's figures, and not a guide to the open.</p>
-  </section>
+  <nav class="links" aria-label="More">
+    <a href="/explain"><strong>How it works →</strong><span>The method in plain words, and how accurate it is</span></a>
+    <a href="/accuracy"><strong>Track record →</strong><span>Every past estimate against the real open</span></a>
+  </nav>
+
+  <p class="foot">An estimate, not advice. WCS figures are the Government of Alberta's; this page isn't an official version of them.</p>
 </div>
 
 <script>
@@ -152,14 +140,15 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
   const META = {
     // Card order (Matt, 2026-11-04): S&P, Dow, Russell 2000, then the two Nasdaqs together. Wide screens: those three across
     // the top, Nasdaq-100 and Composite below; tablets: S&P | Dow, Russell full width, Nasdaq-100 | Composite; phones: top to bottom.
-    spx: { short: "S&P 500", fut: "ES", desc: "the 500 largest US companies" },
-    dji: { short: "Dow", fut: "YM", desc: "30 large blue-chip companies" },
-    rut: { short: "Russell 2000", fut: "RTY", desc: "2,000 smaller US companies" },
-    ndx: { short: "Nasdaq-100", fut: "NQ", desc: "large tech-heavy Nasdaq companies" },
-    ixic: { short: "Nasdaq Composite", fut: "NQ", proxy: true, desc: "nearly every Nasdaq-listed stock",
-      note: (p) => `No futures trade on the Composite, so this applies the Nasdaq-100 futures move (${p}) as a stand-in. The two indexes usually move together, but the Composite also holds thousands of smaller companies, so treat this as rougher than the others.` },
-    tsx: { short: "S&P/TSX Composite", fut: "ES", proxy: true, region: "ca", desc: "Canada's main stock index",
-      note: (p) => `There's no free feed for Canadian index futures, so this applies the S&P 500 futures move (${p}) as a stand-in. The TSX often moves less than the S&P and leans on banks, energy and mining, so treat this as a rough guide and check the drivers.` },
+    // name = how the card's sentence refers to the index.
+    spx: { short: "S&P 500", name: "S&P 500", fut: "ES" },
+    dji: { short: "Dow", name: "Dow", fut: "YM" },
+    rut: { short: "Russell 2000", name: "Russell 2000", fut: "RTY" },
+    ndx: { short: "Nasdaq-100", name: "Nasdaq-100", fut: "NQ" },
+    ixic: { short: "Nasdaq Composite", name: "Composite", fut: "NQ", proxy: true,
+      note: (p) => `No futures trade on the Composite, so this applies the Nasdaq-100 futures move (${p}) as a stand-in. Treat it as rougher than the others.` },
+    tsx: { short: "S&P/TSX Composite", name: "TSX", fut: "ES", proxy: true, region: "ca",
+      note: (p) => `There's no free feed for Canadian index futures, so this applies the S&P 500 futures move (${p}) as a stand-in. A rough guide: check the drivers.` },
   };
   const $ = (id) => document.getElementById(id);
   const fmt = (n, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -174,12 +163,23 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
   const dateLabel = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
   const isWeekday = (wd) => !["Sat", "Sun"].includes(wd);
 
-  function sizeWord(absPct) {
-    if (absPct < 0.1) return "barely any change";
-    if (absPct < 0.3) return "a small move, well within a normal day's ups and downs";
-    if (absPct < 1) return "a moderate move, about the size of a typical trading day";
-    if (absPct < 2) return "a large move, bigger than most days";
-    return "a very large move, the kind that happens only a few times a year";
+  // How big a move is, judged against each index's own history, so "large" means equally rare for every index.
+  // Cut-offs = the 30th, 80th and 98th percentiles of the index's absolute daily closing move over five years
+  // (Yahoo daily closes, Nov 5, 2021 to Nov 4, 2026); under 0.1% is "barely any change" for all. So a "large" move
+  // is bigger than 4 days in 5, and a "very large" one happens about 5 days a year. Refresh about once a year.
+  const SIZE = { spx: [0.3, 1.2, 2.77], dji: [0.28, 1.06, 2.53], rut: [0.5, 1.66, 3.47], ndx: [0.42, 1.73, 3.6], ixic: [0.41, 1.68, 3.62], tsx: [0.27, 0.97, 2.18] };
+  const SIZE_WORDS = [["barely any change", ""], ["a small move", ", well within a normal day's ups and downs"], ["a moderate move", ", about the size of a typical trading day"],
+    ["a large move", ", bigger than most days"], ["a very large move", ", the kind that happens only a few times a year"]];
+  function sizeRank(absPct, key) { const c = SIZE[key] || SIZE.spx; return absPct < 0.1 ? 0 : absPct < c[0] ? 1 : absPct < c[1] ? 2 : absPct < c[2] ? 3 : 4; }
+  const sizeWord = (rank) => SIZE_WORDS[rank].join("");
+  // The card's sentence, e.g. "A small move for the S&P 500, well within a normal day's ups and downs."
+  // short = without the second half; opening = after the open ("A moderate opening move for the Dow.").
+  function sizeLine(absPct, key, name, { short = false, opening = false } = {}) {
+    const r = sizeRank(absPct, key);
+    if (r === 0) return opening ? `Opened barely changed from the close.` : `Barely any change from the close.`;
+    const [head, tail] = SIZE_WORDS[r];
+    const h = opening ? head.replace(" move", " opening move") : head;
+    return `${h.charAt(0).toUpperCase() + h.slice(1)} for the ${name}${short ? "" : tail}.`;
   }
 
   // From the Monday of a quarterly expiry week (3rd Friday of Mar/Jun/Sep/Dec) to the Monday after.
@@ -314,25 +314,25 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
         if (a && a.final) {
           // The index level after the first full minute of trading (close of the 9:30 one-minute bar).
           const oPts = a.close - base, oPct = (oPts / base) * 100;
-          const oDir = setPill(p.key, oPts, oPct);
+          setPill(p.key, oPts, oPct);
           $(`lab-${p.key}`).textContent = "Level at 9:31";
           $(`open-${p.key}`).textContent = fmt(a.close);
-          $(`plain-${p.key}`).textContent = `After its first full minute of trading, the ${m.short} stood ${oDir === "flat" ? "about level with" : fmt(Math.abs(oPct), 2) + "% " + (oDir === "up" ? "above" : "below")} its ${dateLabel(closeDate)} close. The next estimate starts after today's ${closeLabel(cal, n.date)} Eastern close.`;
+          $(`plain-${p.key}`).textContent = `${sizeLine(Math.abs(oPct), p.key, m.name, { short: true, opening: true })} Next estimate after today's ${closeLabel(cal, n.date)} close.`;
         } else if ("at931" in p.index && n.mins < 576) {
           // 9:30 until the first minute is over (the relay says when): show the last estimate meanwhile.
           if (m.region !== "ca") opening = true;
           $(`lab-${p.key}`).textContent = "Opening now · last estimate";
           $(`open-${p.key}`).textContent = implied == null ? "—" : fmt(implied);
           if (implied == null) { $(`chg-${p.key}`).className = "pill"; $(`chg-${p.key}`).textContent = "—"; } else setPill(p.key, pts, pct);
-          $(`plain-${p.key}`).textContent = `The market opened at 9:30. The ${m.short}'s level at 9:31, after its first full minute of trading, will show here in a moment. Until then this is the last estimate.`;
+          $(`plain-${p.key}`).textContent = `Opened at 9:30. The 9:31 level shows here in a moment; until then, this is the last estimate.`;
         } else {
           // No 9:31 level from Yahoo: fall back to the first printed open.
           if (m.region !== "ca") firstPrint = true;
           const oPts = last.open - base, oPct = (oPts / base) * 100;
-          const oDir = setPill(p.key, oPts, oPct);
+          setPill(p.key, oPts, oPct);
           $(`lab-${p.key}`).textContent = "Opened today at";
           $(`open-${p.key}`).textContent = fmt(last.open);
-          $(`plain-${p.key}`).textContent = `The ${m.short} opened ${oDir === "flat" ? "about level with" : fmt(Math.abs(oPct), 2) + "% " + (oDir === "up" ? "above" : "below")} its ${dateLabel(closeDate)} close. This is the first printed level, which can lag the real move because not every stock has traded at 9:30; the 9:31 level isn't available right now. The next estimate starts after today's ${closeLabel(cal, n.date)} Eastern close.`;
+          $(`plain-${p.key}`).textContent = `First printed level: it can lag the real move, because not every stock has traded at 9:30 (the 9:31 level isn't available right now). Next estimate after today's ${closeLabel(cal, n.date)} close.`;
         }
         continue;
       }
@@ -340,18 +340,17 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
         $(`lab-${p.key}`).textContent = "Implied open";
         $(`open-${p.key}`).textContent = "—";
         $(`chg-${p.key}`).className = "pill"; $(`chg-${p.key}`).textContent = "—";
-        $(`plain-${p.key}`).textContent = `Yahoo isn't supplying the ${m.fut} futures price at the ${dateLabel(closeDate)} close right now, so there's no estimate for the ${m.short}. The page tries again every minute.`;
+        $(`plain-${p.key}`).textContent = `Yahoo isn't supplying the ${m.fut} futures price at the ${dateLabel(closeDate)} close right now, so there's no estimate. The page tries again every minute.`;
         continue;
       }
-      const dir = setPill(p.key, pts, pct);
+      setPill(p.key, pts, pct);
       const nextOpen = target === n.date ? "" : ` (next open: ${dateLabel(target)})`;
       $(`lab-${p.key}`).textContent = "Implied open" + nextOpen;
       $(`open-${p.key}`).textContent = fmt(implied);
+      // The pill and the three lines below already give the points, % and futures prices; the sentence says how big the move is.
       $(`plain-${p.key}`).textContent = m.proxy
-        ? `${m.note(sign(pct) + fmt(Math.abs(pct), 2) + "%")} It points to the ${m.short} opening about ${fmt(Math.abs(pct), 2)}% ${pct >= 0 ? "higher" : "lower"}.`
-        : dir === "flat"
-        ? `${m.fut} futures are about where they were at the close, so the ${m.short} (${m.desc}) is expected to open roughly unchanged.`
-        : `${m.fut} futures are ${fmt(Math.abs(pts), pts >= 100 || pts <= -100 ? 0 : 1)} points ${dir === "up" ? "above" : "below"} where they were at the ${dateLabel(closeDate)} close. That points to the ${m.short} (${m.desc}) opening about ${fmt(Math.abs(pct), 2)}% ${dir === "up" ? "higher" : "lower"}, ${sizeWord(Math.abs(pct))}.`;
+        ? `${m.note(sign(pct) + fmt(Math.abs(pct), 2) + "%")} ${sizeLine(Math.abs(pct), p.key, m.name, { short: true })}`
+        : sizeLine(Math.abs(pct), p.key, m.name);
     }
 
     // Headline and explanation
@@ -373,13 +372,15 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     $("headline").textContent = head;
 
     const big = n3 ? Math.max(...core.map((r) => Math.abs(r.pct))) : 0;
+    // "Overall": the biggest move by each index's own yardstick (a 1% Russell move is smaller news than a 1% Dow move).
+    const bigRank = n3 ? Math.max(...core.map((r) => sizeRank(Math.abs(r.pct), r.k))) : 0;
     let ex = marketOpen || !all.length ? "" : `${list(all)}. `;
     const ndx = core.find((r) => r.k === "ndx"), dji = core.find((r) => r.k === "dji");
     if (!marketOpen && n3 >= 2) {
       const weakest = sorted[0], strongest = sorted[sorted.length - 1];
       if (downs.length === n3) ex += `Of the ${n3 === 4 ? "four" : n3} with their own futures, the ${weakest.m.short} is set to fall the most and the ${strongest.m.short} the least. `;
       else if (ups.length === n3) ex += `Of the ${n3 === 4 ? "four" : n3} with their own futures, the ${strongest.m.short} is set to gain the most and the ${weakest.m.short} the least. `;
-      ex += `Overall this is ${sizeWord(big)}.`;
+      ex += `Overall this is ${sizeWord(bigRank)}.`;
       if (ndx && dji && Math.abs(ndx.pct) > Math.abs(dji.pct) * 1.5 && big >= 0.3)
         ex += ` The Nasdaq-100 moving most usually means technology stocks are leading the move.`;
     } else if (marketOpen) {
