@@ -44,7 +44,7 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .note { padding: 10px 14px; border-radius: 8px; background: var(--flat-bg); font-size: 0.9rem; }
 .note.warn { background: var(--warn-bg); color: var(--warn-ink); }
 .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
-@media (min-width: 560px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 560px) { .grid { grid-template-columns: repeat(2, 1fr); } #cards { grid-auto-flow: column; grid-template-rows: repeat(2, auto); } }
 .big { overflow-wrap: anywhere; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 10px; align-content: start; min-width: 0; }
 .card h3 { margin: 0; font-size: 1rem; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
@@ -86,6 +86,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     <h2 id="headline">Loading the latest prices…</h2>
     <p id="explain"></p>
     <div class="note" id="timing" hidden></div>
+    <div class="note warn" id="feed" hidden></div>
     <div class="meta" id="meta"></div>
   </section>
 
@@ -118,11 +119,12 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
 (function () {
   const RELAY = "https://awagbieeouxxhytdhloi.supabase.co/functions/v1/implied-open";
   const META = {
+    // Card order: on phones top to bottom; on wider screens left column (S&P, Dow), then right (Nasdaq-100, Composite).
     spx: { short: "S&P 500", fut: "ES", desc: "the 500 largest US companies" },
+    dji: { short: "Dow", fut: "YM", desc: "30 large blue-chip companies" },
     ndx: { short: "Nasdaq-100", fut: "NQ", desc: "large tech-heavy Nasdaq companies" },
     ixic: { short: "Nasdaq Composite", fut: "NQ", proxy: true, desc: "nearly every Nasdaq-listed stock",
       note: (p) => `No futures trade on the Composite, so this applies the Nasdaq-100 futures move (${p}) as a stand-in. The two indexes usually move together, but the Composite also holds thousands of smaller companies, so treat this as rougher than the others.` },
-    dji: { short: "Dow", fut: "YM", desc: "30 large blue-chip companies" },
     tsx: { short: "S&P/TSX Composite", fut: "ES", proxy: true, region: "ca", desc: "Canada's main stock index",
       note: (p) => `There's no free feed for Canadian index futures, so this applies the S&P 500 futures move (${p}) as a stand-in. The TSX often moves less than the S&P and leans on banks, energy and mining, so treat this as a rough guide and check the drivers.` },
   };
@@ -145,6 +147,16 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     if (absPct < 1) return "a moderate move, about the size of a typical trading day";
     if (absPct < 2) return "a large move, bigger than most days";
     return "a very large move, the kind that happens only a few times a year";
+  }
+
+  // From the Monday of a quarterly expiry week (3rd Friday of Mar/Jun/Sep/Dec) to the Monday after.
+  function expiryWeek(date) {
+    const [y, mo] = date.split("-").map(Number);
+    if (mo % 3) return false;
+    const first = new Date(Date.UTC(y, mo - 1, 1)).getUTCDay();
+    const mon = new Date(Date.UTC(y, mo - 1, 1 + ((5 - first + 7) % 7) + 10)).toISOString().slice(0, 10);
+    const next = new Date(Date.parse(mon) + 7 * 86400000).toISOString().slice(0, 10);
+    return date >= mon && date <= next;
   }
 
   function untilOpen(nowMs) {
@@ -250,6 +262,13 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     $("explain").textContent = ex;
 
     const t = $("timing"); const mins = untilOpen(now);
+    // The relay normally uses one specific futures contract; if Yahoo stops serving it, the relay falls
+    // back to the continuous series, which can be ~1% off around a quarterly expiry. Say so.
+    const fb = [...new Set(j.pairs.filter((p) => p.future.fallback).map((p) => p.future.contract))];
+    if (fb.length) {
+      $("feed").hidden = false;
+      $("feed").textContent = `Data problem: Yahoo isn't supplying the futures contract this page normally uses (${fb.join(", ")}), so it's using Yahoo's general futures price instead. That's usually fine, but in the week around a quarterly futures expiry (the third Friday of March, June, September and December) it can make estimates about 1% too high${expiryWeek(n.date) ? ", and this is one of those weeks, so treat today's estimates as unreliable" : ""}. The page tries again every minute and this note disappears once Yahoo is back. If it's still here a day later, it needs fixing.`;
+    } else $("feed").hidden = true;
     const futAgeMin = (now - newestFut) / 60000;
     t.hidden = false; t.className = "note";
     if (marketOpen) { t.hidden = true; }

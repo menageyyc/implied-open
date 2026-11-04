@@ -7,13 +7,44 @@
 // Composite uses S&P 500 futures (no free source for Canadian index futures);
 // the page applies the futures' percentage move.
 // Deployed to Supabase project "Menage" with verify_jwt = false.
+// Futures are requested as one specific quarterly contract (e.g. ESZ26.CME), chosen by date, not
+// Yahoo's continuous ES=F series: around each expiry that series' live price moves to the next
+// contract days before its daily closes do, which pushed estimates about 1% too high.
 const PAIRS = [
-  { key: "spx", name: "S&P 500", index: "^GSPC", future: "ES=F" },
-  { key: "ndx", name: "Nasdaq-100", index: "^NDX", future: "NQ=F" },
-  { key: "ixic", name: "Nasdaq Composite", index: "^IXIC", future: "NQ=F" },
-  { key: "dji", name: "Dow Jones", index: "^DJI", future: "YM=F" },
-  { key: "tsx", name: "S&P/TSX Composite", index: "^GSPTSE", future: "ES=F" },
+  { key: "spx", name: "S&P 500", index: "^GSPC", future: "ES" },
+  { key: "ndx", name: "Nasdaq-100", index: "^NDX", future: "NQ" },
+  { key: "ixic", name: "Nasdaq Composite", index: "^IXIC", future: "NQ" },
+  { key: "dji", name: "Dow Jones", index: "^DJI", future: "YM" },
+  { key: "tsx", name: "S&P/TSX Composite", index: "^GSPTSE", future: "ES" },
 ];
+const EXCHANGE: Record<string, string> = { ES: "CME", NQ: "CME", YM: "CBT" };
+
+// Eastern date (YYYY-MM-DD) of the next open the page is estimating: today until the 4 p.m. close,
+// otherwise the next weekday.
+function targetDate(ms: number) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  const d = new Date(Date.UTC(+p.year, +p.month - 1, +p.day, 12));
+  const weekend = (x: Date) => x.getUTCDay() === 0 || x.getUTCDay() === 6;
+  if (weekend(d) || +p.hour >= 16) do d.setUTCDate(d.getUTCDate() + 1); while (weekend(d));
+  return d.toISOString().slice(0, 10);
+}
+// The quarterly contract to use for a given open. Contracts expire on the 3rd Friday of
+// Mar/Jun/Sep/Dec; switch to the next one from the Monday of expiry week (when trading moves).
+// The live price and the reference close always come from this same contract.
+function contractFor(root: string, target: string) {
+  const y0 = +target.slice(0, 4);
+  for (let y = y0; y <= y0 + 1; y++) {
+    for (const m of [3, 6, 9, 12]) {
+      const firstDay = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+      const thirdFriday = 1 + ((5 - firstDay + 7) % 7) + 14;
+      const rollDate = new Date(Date.UTC(y, m - 1, thirdFriday - 4)).toISOString().slice(0, 10);
+      if (target < rollDate) return `${root}${"HMUZ"[m / 3 - 1]}${String(y % 100).padStart(2, "0")}.${EXCHANGE[root]}`;
+    }
+  }
+  throw new Error(`no contract for ${target}`);
+}
 
 const DRIVERS = [
   { key: "oil", name: "Crude oil (WTI)", symbol: "CL=F" },
@@ -65,9 +96,19 @@ Deno.serve(async (req) => {
   try {
     const cache = new Map<string, Promise<Awaited<ReturnType<typeof chart>>>>();
     const get = (s: string) => { if (!cache.has(s)) cache.set(s, chart(s)); return cache.get(s)!; };
+    const target = targetDate(Date.now());
+    // Specific contract first; if Yahoo ever stops serving it, fall back to the continuous series
+    // (correct except in the days around an expiry).
+    // Retried on every request, so it recovers by itself as soon as Yahoo serves the contract again.
+    // `fallback: true` tells the page to show a warning.
+    const future = (root: string) => {
+      const contract = contractFor(root, target);
+      return get(contract).then((f) => ({ ...f, contract, fallback: false }))
+        .catch(() => get(`${root}=F`).then((f) => ({ ...f, contract, fallback: true })));
+    };
     const [pairs, drivers, bond] = await Promise.all([
       Promise.all(PAIRS.map(async (p) => {
-        const [idx, fut] = await Promise.all([get(p.index), get(p.future)]);
+        const [idx, fut] = await Promise.all([get(p.index), future(p.future)]);
         return { key: p.key, name: p.name, index: idx, future: fut };
       })),
       Promise.all(DRIVERS.map(async (d) => {

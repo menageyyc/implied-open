@@ -16,12 +16,13 @@
 import postgres from "npm:postgres@3.4.5";
 
 const PAIRS = [
-  { key: "spx", index: "^GSPC", future: "ES=F", proxy: false },
-  { key: "ndx", index: "^NDX", future: "NQ=F", proxy: false },
-  { key: "ixic", index: "^IXIC", future: "NQ=F", proxy: true },
-  { key: "dji", index: "^DJI", future: "YM=F", proxy: false },
-  { key: "tsx", index: "^GSPTSE", future: "ES=F", proxy: true },
+  { key: "spx", index: "^GSPC", future: "ES", proxy: false },
+  { key: "ndx", index: "^NDX", future: "NQ", proxy: false },
+  { key: "ixic", index: "^IXIC", future: "NQ", proxy: true },
+  { key: "dji", index: "^DJI", future: "YM", proxy: false },
+  { key: "tsx", index: "^GSPTSE", future: "ES", proxy: true },
 ];
+const EXCHANGE: Record<string, string> = { ES: "CME", NQ: "CME", YM: "CBT" };
 type Pair = typeof PAIRS[number];
 
 const OPEN_MIN = 570; // 9:30 a.m.
@@ -75,6 +76,23 @@ function targetFor(ms: number) {
   const horizon = Math.round((etToMs(target, OPEN_MIN) - ms) / 60000);
   if (horizon < 0 || horizon > MAX_HORIZON) return null;
   return { target, horizon };
+}
+
+// ---------- Futures contract (same rule as the relay) ----------
+// One specific quarterly contract per open being estimated (e.g. ESZ26.CME), not Yahoo's continuous
+// ES=F series, whose live price and daily closes switch contracts on different days around expiry.
+// Contracts expire on the 3rd Friday of Mar/Jun/Sep/Dec; switch from the Monday of expiry week.
+function contractFor(root: string, target: string) {
+  const y0 = +target.slice(0, 4);
+  for (let y = y0; y <= y0 + 1; y++) {
+    for (const m of [3, 6, 9, 12]) {
+      const firstDay = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+      const thirdFriday = 1 + ((5 - firstDay + 7) % 7) + 14;
+      const rollDate = new Date(Date.UTC(y, m - 1, thirdFriday - 4)).toISOString().slice(0, 10);
+      if (target < rollDate) return `${root}${"HMUZ"[m / 3 - 1]}${String(y % 100).padStart(2, "0")}.${EXCHANGE[root]}`;
+    }
+  }
+  throw new Error(`no contract for ${target}`);
 }
 
 // ---------- Yahoo ----------
@@ -154,14 +172,25 @@ async function tick() {
   // Snapshot: only while a futures price can count toward an upcoming open.
   const snaps: Record<string, unknown>[] = [];
   const notes: string[] = [];
+  // The open these snapshots count toward, to pick the contract. Yahoo's futures run ~10 minutes
+  // behind, so just after 9:30 the latest price can still be from before the open: look back 30 min.
+  const tNow = targetFor(Math.floor(now / 300000) * 300000) ?? targetFor(Math.floor((now - 30 * 60000) / 300000) * 300000);
   for (const p of PAIRS) {
     try {
-      const fut = await get(p.future, "5d", "1d");
+      if (!tNow) { notes.push(`${p.key}: outside the snapshot window`); continue; }
+      // Same fallback as the relay (continuous series if Yahoo stops serving the contract), so the
+      // tracker keeps measuring what the page shows; noted in the tick result.
+      const contract = contractFor(p.future, tNow.target);
+      const fut = await get(contract, "5d", "1d").catch(async () => {
+        notes.push(`${p.key}: ${contract} unavailable, used ${p.future}=F`);
+        return get(`${p.future}=F`, "5d", "1d");
+      });
       const ms = fut.time * 1000;
       if (now - ms > 30 * 60000) { notes.push(`${p.key}: futures price is stale`); continue; }
       const slot = Math.floor(ms / 300000) * 300000;
       const t = targetFor(slot);
       if (!t) { notes.push(`${p.key}: outside the snapshot window`); continue; }
+      if (t.target !== tNow.target) { notes.push(`${p.key}: futures price is from the previous window`); continue; }
       const idx = await get(p.index, "5d", "1d");
       const r = implied(p, idx.bars, fut.bars, t.target, fut.price);
       if (!r) { notes.push(`${p.key}: missing close or futures reference`); continue; }
@@ -188,22 +217,40 @@ async function backfill(key: string, from = "0000-00-00", to = "9999-99-99") {
   const p = PAIRS.find((x) => x.key === key);
   if (!p) throw new Error("unknown key");
   const get = makeGetter();
-  const [idxD, idx5, futD, fut5] = await Promise.all([
-    get(p.index, "3mo", "1d"), get(p.index, "60d", "5m"), get(p.future, "3mo", "1d"), get(p.future, "60d", "5m"),
-  ]);
+  const [idxD, idx5] = await Promise.all([get(p.index, "3mo", "1d"), get(p.index, "60d", "5m")]);
+  // Each target date uses its own contract (both the 5-minute prices and the reference close).
+  // Yahoo drops expired contracts, so targets whose contract is gone are skipped (existing rows are kept).
+  const futs = new Map<string, Promise<{ d: Awaited<ReturnType<typeof chart>>; f: Awaited<ReturnType<typeof chart>> } | null>>();
+  const futFor = (c: string) => {
+    if (!futs.has(c)) futs.set(c, Promise.all([get(c, "3mo", "1d"), get(c, "60d", "5m")]).then(([d, f]) => ({ d, f })).catch(() => null));
+    return futs.get(c)!;
+  };
+  // Contracts covering the requested targets, within the ~60 days of 5-minute history Yahoo keeps.
+  const today = et(Date.now()).date, first = from > addDays(today, -100) ? from : addDays(today, -100);
+  const last = to < addDays(today, 7) ? to : addDays(today, 7);
+  const contracts: string[] = [];
+  for (let d = first; d <= last; d = addDays(d, 1)) {
+    const c = contractFor(p.future, d);
+    if (!contracts.includes(c)) contracts.push(c);
+  }
+  const loaded = new Map(await Promise.all(contracts.map(async (c) => [c, await futFor(c)] as const)));
   const rows: Record<string, unknown>[] = [];
-  for (const b of fut5.bars) {
-    const ms = (b.t + 300) * 1000; // a five-minute bar's close is the price at the end of the bar
-    if (ms > Date.now() - 15 * 60000) continue; // leave recent times to the live logger
-    const t = targetFor(ms);
-    if (!t || t.target < from || t.target > to) continue;
-    const r = implied(p, idxD.bars, futD.bars, t.target, b.close);
-    if (!r) continue;
-    rows.push({ target_date: t.target, key, horizon_min: t.horizon, data_time: new Date(ms), ...r, source: "backfill" });
+  for (const [c, fut] of loaded) {
+    if (!fut) continue;
+    for (const b of fut.f.bars) {
+      const ms = (b.t + 300) * 1000; // a five-minute bar's close is the price at the end of the bar
+      if (ms > Date.now() - 15 * 60000) continue; // leave recent times to the live logger
+      const t = targetFor(ms);
+      if (!t || t.target < from || t.target > to || contractFor(p.future, t.target) !== c) continue;
+      const r = implied(p, idxD.bars, fut.d.bars, t.target, b.close);
+      if (!r) continue;
+      rows.push({ target_date: t.target, key, horizon_min: t.horizon, data_time: new Date(ms), ...r, source: "backfill" });
+    }
   }
   await saveSnapshots(rows);
   const actuals = await saveActuals(actualsFrom(key, idxD.bars, idx5.bars).filter((r) => r.trade_date >= from && r.trade_date <= to));
-  return { key, from, to, snapshots: rows.length, actuals };
+  const unavailable = [...loaded].filter(([, f]) => !f).map(([c]) => c);
+  return { key, from, to, contracts, unavailable, snapshots: rows.length, actuals };
 }
 
 Deno.serve(async (req) => {
