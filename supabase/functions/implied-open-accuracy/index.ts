@@ -4,11 +4,13 @@
 // POST (needs header x-log-secret = the Vault secret implied_open_log_secret):
 //   {"action":"tick"}               every 5 minutes from pg_cron: saves a snapshot of the
 //                                   implied open (same formula as the page) and, after the
-//                                   open, the actual opening numbers.
+//                                   open, the actual opening numbers (official open, level at 9:31
+//                                   and price at 9:35).
 //   {"action":"backfill","key":"..","from":"YYYY-MM-DD","to":"YYYY-MM-DD"}
 //                                   one-off: rebuilds past estimates from Yahoo's 5-minute futures
 //                                   history (about 60 days) and the actual opens, for target dates
-//                                   in [from, to] (run in small ranges to stay within limits).
+//                                   in [from, to] (run in small ranges to stay within limits). The 9:31
+//                                   level is filled only where Yahoo still has 1-minute data (~30 days).
 //
 // Data lives in the database schema implied_open (not exposed through the API). Symbols are
 // fixed, there is no user input to fetch, so this can't be used as a proxy.
@@ -16,12 +18,12 @@
 import postgres from "npm:postgres@3.4.5";
 
 const PAIRS = [
-  { key: "spx", index: "^GSPC", future: "ES", proxy: false },
-  { key: "ndx", index: "^NDX", future: "NQ", proxy: false },
-  { key: "ixic", index: "^IXIC", future: "NQ", proxy: true },
-  { key: "dji", index: "^DJI", future: "YM", proxy: false },
-  { key: "tsx", index: "^GSPTSE", future: "ES", proxy: true },
-];
+  { key: "spx", index: "^GSPC", future: "ES", proxy: false, cal: "us" },
+  { key: "ndx", index: "^NDX", future: "NQ", proxy: false, cal: "us" },
+  { key: "ixic", index: "^IXIC", future: "NQ", proxy: true, cal: "us" },
+  { key: "dji", index: "^DJI", future: "YM", proxy: false, cal: "us" },
+  { key: "tsx", index: "^GSPTSE", future: "ES", proxy: true, cal: "ca" },
+] as const;
 const EXCHANGE: Record<string, string> = { ES: "CME", NQ: "CME", YM: "CBT" };
 type Pair = typeof PAIRS[number];
 
@@ -54,8 +56,43 @@ const isWeekend = (wd: string) => wd === "Sat" || wd === "Sun";
 function addDays(date: string, n: number) {
   const d = new Date(date + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
 }
-const weekdayOf = (date: string) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(date + "T12:00:00Z").getUTCDay()];
-function nextWeekday(date: string) { let d = addDays(date, 1); while (isWeekend(weekdayOf(d))) d = addDays(d, 1); return d; }
+
+// ---------- Market calendars ----------
+// Full closures and 1 p.m. ET early closes. Checked 2026-11-04 against the official pages
+// (nyse.com/markets/hours-calendars and tsx.com's trading calendar). The same lists are in
+// site/index.html and supabase/functions/implied-open/index.ts: change all three together.
+// They end with 2027: add 2028 before then (after the last listed date, only weekends are skipped).
+const CAL: Record<"us" | "ca", { closed: Record<string, string>; early: Record<string, string> }> = {
+  us: {
+    closed: {
+      "2026-01-01": "New Year's Day", "2026-01-19": "Martin Luther King Jr. Day", "2026-02-16": "Washington's Birthday",
+      "2026-04-03": "Good Friday", "2026-05-25": "Memorial Day", "2026-06-19": "Juneteenth", "2026-07-03": "Independence Day (observed)",
+      "2026-09-07": "Labor Day", "2026-11-26": "Thanksgiving", "2026-12-25": "Christmas",
+      "2027-01-01": "New Year's Day", "2027-01-18": "Martin Luther King Jr. Day", "2027-02-15": "Washington's Birthday",
+      "2027-03-26": "Good Friday", "2027-05-31": "Memorial Day", "2027-06-18": "Juneteenth (observed)", "2027-07-05": "Independence Day (observed)",
+      "2027-09-06": "Labor Day", "2027-11-25": "Thanksgiving", "2027-12-24": "Christmas (observed)",
+    },
+    early: { "2026-11-27": "the day after Thanksgiving", "2026-12-24": "Christmas Eve", "2027-11-26": "the day after Thanksgiving" },
+  },
+  ca: {
+    closed: {
+      "2026-01-01": "New Year's Day", "2026-02-16": "Family Day", "2026-04-03": "Good Friday", "2026-05-18": "Victoria Day",
+      "2026-07-01": "Canada Day", "2026-08-03": "Civic Holiday", "2026-09-07": "Labour Day", "2026-10-12": "Thanksgiving",
+      "2026-12-25": "Christmas", "2026-12-28": "Boxing Day (observed)",
+      "2027-01-01": "New Year's Day", "2027-02-15": "Family Day", "2027-03-26": "Good Friday", "2027-05-24": "Victoria Day",
+      "2027-07-01": "Canada Day", "2027-08-02": "Civic Holiday", "2027-09-06": "Labour Day", "2027-10-11": "Thanksgiving",
+      "2027-12-27": "Christmas (observed)", "2027-12-28": "Boxing Day (observed)",
+    },
+    early: { "2026-12-24": "Christmas Eve", "2027-12-24": "Christmas Eve" },
+  },
+};
+type Cal = keyof typeof CAL;
+function isTradingDay(cal: Cal, date: string) {
+  const wd = new Date(date + "T12:00:00Z").getUTCDay();
+  return wd !== 0 && wd !== 6 && !(date in CAL[cal].closed);
+}
+const closeMin = (cal: Cal, date: string) => (date in CAL[cal].early ? 780 : 960); // 1 p.m. or 4 p.m.
+function nextTradingDay(cal: Cal, date: string) { let d = addDays(date, 1); while (!isTradingDay(cal, d)) d = addDays(d, 1); return d; }
 // UTC milliseconds of a given Eastern date + minutes after midnight (handles daylight saving).
 function etToMs(date: string, mins: number) {
   let guess = Date.parse(date + "T00:00:00Z") + (mins + 300) * 60000;
@@ -66,12 +103,13 @@ function etToMs(date: string, mins: number) {
   }
   return guess;
 }
-// Which open a futures price at time ms counts toward, and how many minutes before it.
-function targetFor(ms: number) {
+// Which open (of the given market) a futures price at time ms counts toward, and how many minutes before it.
+// Holidays are skipped, so e.g. on the evening before US Thanksgiving the US target is the Friday.
+function targetFor(ms: number, cal: Cal) {
   const e = et(ms);
   let target: string | null = null;
-  if (e.mins >= 18 * 60) target = nextWeekday(e.date);
-  else if (e.mins <= OPEN_MIN && !isWeekend(e.wd)) target = e.date;
+  if (e.mins >= 18 * 60) target = nextTradingDay(cal, e.date);
+  else if (e.mins <= OPEN_MIN && isTradingDay(cal, e.date)) target = e.date;
   if (!target) return null;
   const horizon = Math.round((etToMs(target, OPEN_MIN) - ms) / 60000);
   if (horizon < 0 || horizon > MAX_HORIZON) return null;
@@ -97,8 +135,10 @@ function contractFor(root: string, target: string) {
 
 // ---------- Yahoo ----------
 type Bar = { t: number; open: number | null; close: number; d: string; m: number }; // d, m = Eastern date and minutes
+// range is "5d", "60d" etc., or "p<period1>-<period2>" (Unix seconds) for a fixed window.
 async function chart(symbol: string, range: string, interval: string) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=${interval}`;
+  const span = range.startsWith("p") ? `period1=${range.slice(1).split("-")[0]}&period2=${range.slice(1).split("-")[1]}` : `range=${range}`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?${span}&interval=${interval}`;
   const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
   if (!res.ok) throw new Error(`${symbol} ${range}/${interval}: HTTP ${res.status}`);
   const r = (await res.json())?.chart?.result?.[0];
@@ -118,29 +158,45 @@ function makeGetter() {
   };
 }
 
-// The page's formula. closeBars = index daily bars, futBars = futures daily bars.
-function implied(p: Pair, closeBars: Bar[], futBars: Bar[], target: string, fNow: number) {
+// The index close an estimate for `target` starts from: the last daily bar before it.
+function lastClose(closeBars: Bar[], target: string) {
   const prior = closeBars.filter((b) => b.d < target);
-  const closeBar = prior[prior.length - 1];
-  if (!closeBar) return null;
-  const closeDate = closeBar.d;
-  const fRef = futBars.find((b) => b.d === closeDate);
-  if (!fRef) return null;
-  const fPts = fNow - fRef.close;
-  const pct = p.proxy ? (fPts / fRef.close) * 100 : (fPts / closeBar.close) * 100;
+  return prior[prior.length - 1] ?? null;
+}
+// Futures reference for a close date (same rule as the relay): Yahoo's daily futures close, which is
+// the futures price at the 4 p.m. close; except on 1 p.m. early closes (futures trade until 1:15 p.m.,
+// and Yahoo's daily close is that 1:15 price) and on days with no daily futures bar (US holidays on
+// which the TSX trades; Yahoo leaves out futures' holiday sessions). On those days it's the futures
+// price at the index's close time: the close of the last 5-minute bar that ended by then.
+const needsFive = (p: Pair, closeDate: string, futBars: Bar[]) => closeDate in CAL[p.cal].early || !futBars.some((b) => b.d === closeDate);
+function futRef(p: Pair, closeDate: string, futBars: Bar[], five: Bar[] | null) {
+  if (!needsFive(p, closeDate, futBars)) return futBars.find((b) => b.d === closeDate)!.close;
+  if (!five) return null;
+  const at = etToMs(closeDate, closeMin(p.cal, closeDate));
+  let best: Bar | null = null;
+  for (const b of five) if ((b.t + 300) * 1000 <= at) best = b;
+  return best ? best.close : null;
+}
+// The page's formula. closeBar = the index close it starts from, fRef = futures at that close.
+function implied(p: Pair, closeBar: Bar, fRef: number, fNow: number) {
+  const fPts = fNow - fRef;
+  const pct = p.proxy ? (fPts / fRef) * 100 : (fPts / closeBar.close) * 100;
   const value = p.proxy ? closeBar.close * (1 + pct / 100) : closeBar.close + fPts;
-  return { implied: value, pct, prev_close: closeBar.close, close_date: closeDate, fut_ref: fRef.close, fut_now: fNow };
+  return { implied: value, pct, prev_close: closeBar.close, close_date: closeBar.d, fut_ref: fRef, fut_now: fNow };
 }
 
-// Actual opens from index bars: official open = first printed value; 9:35 = close of the 9:30 five-minute bar.
-function actualsFrom(key: string, daily: Bar[], five: Bar[]) {
-  const at930 = new Map<string, Bar>();
+// Actual opens from index bars: official open = first printed value; 9:31 = close of the 9:30
+// one-minute bar (the first full minute of trading); 9:35 = close of the 9:30 five-minute bar.
+function actualsFrom(key: string, daily: Bar[], five: Bar[], one: Bar[] = []) {
+  const at930 = new Map<string, Bar>(), at931 = new Map<string, number>();
   for (const b of five) if (b.m === OPEN_MIN) at930.set(b.d, b);
+  for (const b of one) if (b.m === OPEN_MIN) at931.set(b.d, b.close);
   const rows = [];
   for (let i = 1; i < daily.length; i++) {
     const d = daily[i].d;
     const b = at930.get(d);
-    rows.push({ trade_date: d, key, prev_close: daily[i - 1].close, open_official: daily[i].open ?? b?.open ?? null, price_935: b ? b.close : null });
+    rows.push({ trade_date: d, key, prev_close: daily[i - 1].close, open_official: daily[i].open ?? b?.open ?? null,
+      price_931: at931.get(d) ?? null, price_935: b ? b.close : null });
   }
   return rows;
 }
@@ -160,8 +216,9 @@ async function saveSnapshots(rows: Record<string, unknown>[]) {
 async function saveActuals(rows: Record<string, unknown>[]) {
   const ok = rows.filter((r) => r.open_official != null);
   if (!ok.length) return 0;
-  await sql`insert into implied_open.actuals ${sql(ok, ["trade_date", "key", "prev_close", "open_official", "price_935"])}
+  await sql`insert into implied_open.actuals ${sql(ok, ["trade_date", "key", "prev_close", "open_official", "price_931", "price_935"])}
     on conflict (trade_date, key) do update set prev_close = excluded.prev_close, open_official = excluded.open_official,
+      price_931 = coalesce(excluded.price_931, implied_open.actuals.price_931),
       price_935 = coalesce(excluded.price_935, implied_open.actuals.price_935), updated_at = now()`;
   return ok.length;
 }
@@ -172,28 +229,35 @@ async function tick() {
   // Snapshot: only while a futures price can count toward an upcoming open.
   const snaps: Record<string, unknown>[] = [];
   const notes: string[] = [];
-  // The open these snapshots count toward, to pick the contract. Yahoo's futures run ~10 minutes
-  // behind, so just after 9:30 the latest price can still be from before the open: look back 30 min.
-  const tNow = targetFor(Math.floor(now / 300000) * 300000) ?? targetFor(Math.floor((now - 30 * 60000) / 300000) * 300000);
   for (const p of PAIRS) {
     try {
+      // The open these snapshots count toward (by this index's market calendar), to pick the contract.
+      // Yahoo's futures run ~10 minutes behind, so just after 9:30 the latest price can still be from
+      // before the open: look back 30 min.
+      const tNow = targetFor(Math.floor(now / 300000) * 300000, p.cal) ?? targetFor(Math.floor((now - 30 * 60000) / 300000) * 300000, p.cal);
       if (!tNow) { notes.push(`${p.key}: outside the snapshot window`); continue; }
       // Same fallback as the relay (continuous series if Yahoo stops serving the contract), so the
       // tracker keeps measuring what the page shows; noted in the tick result.
       const contract = contractFor(p.future, tNow.target);
+      let futSymbol = contract;
       const fut = await get(contract, "5d", "1d").catch(async () => {
         notes.push(`${p.key}: ${contract} unavailable, used ${p.future}=F`);
-        return get(`${p.future}=F`, "5d", "1d");
+        futSymbol = `${p.future}=F`;
+        return get(futSymbol, "5d", "1d");
       });
       const ms = fut.time * 1000;
       if (now - ms > 30 * 60000) { notes.push(`${p.key}: futures price is stale`); continue; }
       const slot = Math.floor(ms / 300000) * 300000;
-      const t = targetFor(slot);
+      const t = targetFor(slot, p.cal);
       if (!t) { notes.push(`${p.key}: outside the snapshot window`); continue; }
       if (t.target !== tNow.target) { notes.push(`${p.key}: futures price is from the previous window`); continue; }
       const idx = await get(p.index, "5d", "1d");
-      const r = implied(p, idx.bars, fut.bars, t.target, fut.price);
-      if (!r) { notes.push(`${p.key}: missing close or futures reference`); continue; }
+      const closeBar = lastClose(idx.bars, t.target);
+      if (!closeBar) { notes.push(`${p.key}: missing close`); continue; }
+      const five = needsFive(p, closeBar.d, fut.bars) ? (await get(futSymbol, "5d", "5m")).bars : null;
+      const fRef = futRef(p, closeBar.d, fut.bars, five);
+      if (fRef == null) { notes.push(`${p.key}: missing futures reference for ${closeBar.d}`); continue; }
+      const r = implied(p, closeBar, fRef, fut.price);
       snaps.push({ target_date: t.target, key: p.key, horizon_min: t.horizon, data_time: new Date(ms), ...r, source: "live" });
     } catch (e) { notes.push(`${p.key}: ${(e as Error).message}`); }
   }
@@ -204,8 +268,9 @@ async function tick() {
     let saved = 0;
     for (const p of PAIRS) {
       try {
-        const [d, f] = await Promise.all([get(p.index, "5d", "1d"), get(p.index, "5d", "5m")]);
-        saved += await saveActuals(actualsFrom(p.key, d.bars, f.bars));
+        const [d, f, o] = await Promise.all([get(p.index, "5d", "1d"), get(p.index, "5d", "5m"),
+          get(p.index, "1d", "1m").catch(() => ({ bars: [] as Bar[] }))]);
+        saved += await saveActuals(actualsFrom(p.key, d.bars, f.bars, o.bars));
       } catch (e) { notes.push(`${p.key} actuals: ${(e as Error).message}`); }
     }
     out.actuals = saved;
@@ -240,17 +305,26 @@ async function backfill(key: string, from = "0000-00-00", to = "9999-99-99") {
     for (const b of fut.f.bars) {
       const ms = (b.t + 300) * 1000; // a five-minute bar's close is the price at the end of the bar
       if (ms > Date.now() - 15 * 60000) continue; // leave recent times to the live logger
-      const t = targetFor(ms);
+      const t = targetFor(ms, p.cal);
       if (!t || t.target < from || t.target > to || contractFor(p.future, t.target) !== c) continue;
-      const r = implied(p, idxD.bars, fut.d.bars, t.target, b.close);
-      if (!r) continue;
-      rows.push({ target_date: t.target, key, horizon_min: t.horizon, data_time: new Date(ms), ...r, source: "backfill" });
+      const closeBar = lastClose(idxD.bars, t.target);
+      if (!closeBar) continue;
+      const fRef = futRef(p, closeBar.d, fut.d.bars, fut.f.bars);
+      if (fRef == null) continue;
+      rows.push({ target_date: t.target, key, horizon_min: t.horizon, data_time: new Date(ms), ...implied(p, closeBar, fRef, b.close), source: "backfill" });
     }
   }
   await saveSnapshots(rows);
-  const actuals = await saveActuals(actualsFrom(key, idxD.bars, idx5.bars).filter((r) => r.trade_date >= from && r.trade_date <= to));
+  // 9:31 levels: Yahoo keeps 1-minute bars for about 30 days and serves at most 7 days per request.
+  const one: Bar[] = [];
+  const oneFrom = from > addDays(today, -29) ? from : addDays(today, -29), oneTo = to < today ? to : today;
+  for (let d = oneFrom; d <= oneTo; d = addDays(d, 7)) {
+    const p1 = Math.floor(etToMs(d, 0) / 1000), p2 = Math.floor(etToMs(addDays(d, 7), 0) / 1000);
+    try { one.push(...(await get(p.index, `p${p1}-${p2}`, "1m")).bars); } catch { /* no 1-minute data for this week */ }
+  }
+  const actuals = await saveActuals(actualsFrom(key, idxD.bars, idx5.bars, one).filter((r) => r.trade_date >= from && r.trade_date <= to));
   const unavailable = [...loaded].filter(([, f]) => !f).map(([c]) => c);
-  return { key, from, to, contracts, unavailable, snapshots: rows.length, actuals };
+  return { key, from, to, contracts, unavailable, snapshots: rows.length, actuals, with931: one.filter((b) => b.m === OPEN_MIN).length };
 }
 
 Deno.serve(async (req) => {

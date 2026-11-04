@@ -98,7 +98,7 @@
     $("sxf-settle").textContent = fmt(f.settlement, 1);
     $("sxf-nl").textContent = `SXF now (${how})`;
     $("sxf-now").textContent = fmt(px, 2);
-    const cmp = `${sign(tsx.pct)}${fmt(Math.abs(tsx.pct), 2)}%`;
+    const cmp = tsx.pct == null ? "unavailable" : `${sign(tsx.pct)}${fmt(Math.abs(tsx.pct), 2)}%`;
     $("sxf-plain").textContent = dir === "flat"
       ? `TSX 60 futures are about where they settled, so the TSX is expected to open roughly unchanged. For comparison, the S&P 500 stand-in below says ${cmp}.`
       : `TSX 60 futures are ${fmt(Math.abs(px - f.settlement), 1)} points (${fmt(Math.abs(pct), 2)}%) ${dir === "up" ? "above" : "below"} their last settlement. Applied to the Composite, that points to an open about ${fmt(Math.abs(pct), 2)}% ${dir === "up" ? "higher" : "lower"}, ${sizeWord(Math.abs(pct))}. For comparison, the S&P 500 stand-in below says ${cmp}.`;
