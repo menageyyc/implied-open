@@ -61,6 +61,15 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
 .method { color: var(--muted); font-size: 0.88rem; display: grid; gap: 6px; max-width: 75ch; }
 .method h3 { color: var(--ink); font-size: 0.95rem; margin: 0; }
 .method p { margin: 0; }
+.section-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 8px 0 -8px; }
+.section-h h2 { font-family: var(--display); font-weight: 600; font-size: 1.35rem; margin: 0; }
+.section-h p { margin: 0; color: var(--muted); font-size: 0.88rem; }
+.drivers { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.drivers li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.drivers li:last-child { border-bottom: 0; padding-bottom: 0; }
+.drivers .dname { font-weight: 600; }
+.drivers .dval { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.drivers .dwhy { grid-column: 1 / -1; color: var(--muted); font-size: 0.88rem; }
 </style>
 </head>
 <body>
@@ -68,7 +77,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
   <header>
     <div>
       <h1>Implied Open</h1>
-      <p class="sub">Where the S&amp;P 500, Nasdaq and Dow are likely to open at 9:30 a.m. Eastern, worked out live from overnight futures trading.</p>
+      <p class="sub">Where the S&amp;P 500, Nasdaq, Dow and Toronto's TSX are likely to open at 9:30 a.m. Eastern, worked out live from overnight futures trading.</p>
     </div>
     <button id="refresh" type="button">Refresh</button>
   </header>
@@ -82,11 +91,25 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
 
   <div class="grid" id="cards"></div>
 
+  <div class="section-h"><h2>Canada</h2><p>The TSX opens at 9:30 a.m. Eastern too.</p></div>
+  <section class="summary" aria-live="polite">
+    <h2 id="ca-headline">Loading Canadian prices…</h2>
+    <p id="ca-explain"></p>
+  </section>
+  <div class="grid">
+    <div id="ca-cards" style="display:grid;min-width:0"></div>
+    <article class="card">
+      <h3>What's moving Canada overnight<span>vs last close</span></h3>
+      <ul class="drivers" id="drivers"></ul>
+    </article>
+  </div>
+
   <section class="method">
     <h3>How to read this</h3>
     <p><strong>What "implied open" means.</strong> The stock market is closed overnight, but futures on the S&amp;P 500, Nasdaq-100 and Dow trade almost around the clock. However far a futures contract has moved since the market closed at 4 p.m. Eastern, the index is expected to open roughly that far up or down. Implied open = last close + that futures move.</p>
     <p><strong>It gets more accurate closer to the open.</strong> Overnight trading is light, so prices drift and can swing on little news. More traders join from about 8 a.m. Eastern, and economic reports often come out at 8:30 a.m. An estimate taken a few minutes before 9:30 is usually much closer to the real open than one taken the night before.</p>
     <p><strong>Limits.</strong> It's an estimate, not a forecast or advice. The first printed index level can differ a little, because not every stock starts trading at exactly 9:30. Prices come from Yahoo Finance's free feed, where futures prices run about 10 minutes behind and which isn't officially supported. Market holidays aren't accounted for. Futures used: E-mini S&amp;P 500 (ES), E-mini Nasdaq-100 (NQ), Mini Dow (YM). The Nasdaq Composite has no futures of its own, so it borrows the NQ percentage move. The page refreshes itself every minute.</p>
+    <p><strong>Canada.</strong> Canadian index futures (TSX 60, traded on the Montreal Exchange) have no free public feed, so the TSX estimate borrows the S&amp;P 500 futures move. That makes it the roughest number on the page. The TSX usually moves in the same direction as the S&amp;P, but it leans much more on banks, energy and mining, so check the drivers. Oil, natural gas, gold and the Canadian dollar come from Yahoo Finance. The Government of Canada 10-year bond yield comes from the Bank of Canada and is updated once a day, so it shows the latest published close, not an overnight move.</p>
   </section>
 </div>
 
@@ -96,8 +119,11 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
   const META = {
     spx: { short: "S&P 500", fut: "ES", desc: "the 500 largest US companies" },
     ndx: { short: "Nasdaq-100", fut: "NQ", desc: "large tech-heavy Nasdaq companies" },
-    ixic: { short: "Nasdaq Composite", fut: "NQ", proxy: true, desc: "nearly every Nasdaq-listed stock" },
+    ixic: { short: "Nasdaq Composite", fut: "NQ", proxy: true, desc: "nearly every Nasdaq-listed stock",
+      note: (p) => `No futures trade on the Composite, so this applies the Nasdaq-100 futures move (${p}) as a stand-in. The two indexes usually move together, but the Composite also holds thousands of smaller companies, so treat this as rougher than the others.` },
     dji: { short: "Dow", fut: "YM", desc: "30 large blue-chip companies" },
+    tsx: { short: "S&P/TSX Composite", fut: "ES", proxy: true, region: "ca", desc: "Canada's main stock index",
+      note: (p) => `There's no free feed for Canadian index futures, so this applies the S&P 500 futures move (${p}) as a stand-in. The TSX often moves less than the S&P and leans on banks, energy and mining, so treat this as a rough guide and check the drivers.` },
   };
   const $ = (id) => document.getElementById(id);
   const fmt = (n, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -127,18 +153,21 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
   }
 
   function buildCards() {
-    $("cards").innerHTML = Object.entries(META).map(([k, m]) => `
+    const html = (rows) => rows.map(([k, m]) => `
       <article class="card" id="card-${k}">
-        <h3>${m.short}<span>${m.proxy ? "uses NQ futures" : m.fut + " futures"}</span></h3>
+        <h3>${m.short}<span>${m.proxy ? "uses " + m.fut + " futures" : m.fut + " futures"}</span></h3>
         <div><div class="label" id="lab-${k}">Implied open</div><div class="big" id="open-${k}">—</div></div>
         <div class="pill" id="chg-${k}">—</div>
         <p id="plain-${k}"></p>
         <dl>
           <dt id="cl-${k}">Last close</dt><dd id="close-${k}">—</dd>
-          <dt>${m.proxy ? "NQ futures" : "Futures"} at that close</dt><dd id="fref-${k}">—</dd>
-          <dt>${m.proxy ? "NQ futures" : "Futures"} now</dt><dd id="fnow-${k}">—</dd>
+          <dt>${m.proxy ? m.fut + " futures" : "Futures"} at that close</dt><dd id="fref-${k}">—</dd>
+          <dt>${m.proxy ? m.fut + " futures" : "Futures"} now</dt><dd id="fnow-${k}">—</dd>
         </dl>
       </article>`).join("");
+    const rows = Object.entries(META);
+    $("cards").innerHTML = html(rows.filter(([, m]) => m.region !== "ca"));
+    $("ca-cards").innerHTML = html(rows.filter(([, m]) => m.region === "ca"));
   }
 
   function render(j) {
@@ -150,7 +179,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
       const bars = p.index.bars, last = bars[bars.length - 1];
       const lastDate = et(last.t * 1000).date;
       const openNow = lastDate === n.date && n.mins >= 570 && n.mins < 960;
-      marketOpen = marketOpen || openNow;
+      if (m.region !== "ca") marketOpen = marketOpen || openNow;
       const closeBar = openNow && bars.length > 1 ? bars[bars.length - 2] : last;
       const closeDate = et(closeBar.t * 1000).date;
       const fRef = p.future.bars.find((b) => et(b.t * 1000).date === closeDate);
@@ -182,14 +211,14 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
       $(`chg-${p.key}`).className = "pill" + (dir === "flat" ? "" : " " + dir);
       $(`chg-${p.key}`).textContent = `${sign(pts)}${fmt(Math.abs(pts), 1)} pts  ${sign(pct)}${fmt(Math.abs(pct), 2)}%`;
       $(`plain-${p.key}`).textContent = m.proxy
-        ? `No futures trade on the Composite, so this applies the Nasdaq-100 futures move (${sign(pct)}${fmt(Math.abs(pct), 2)}%) as a stand-in. The two indexes usually move together, but the Composite also holds thousands of smaller companies, so treat this as rougher than the others. It points to the ${m.short} opening about ${fmt(Math.abs(pct), 2)}% ${pct >= 0 ? "higher" : "lower"}.`
+        ? `${m.note(sign(pct) + fmt(Math.abs(pct), 2) + "%")} It points to the ${m.short} opening about ${fmt(Math.abs(pct), 2)}% ${pct >= 0 ? "higher" : "lower"}.`
         : dir === "flat"
         ? `${m.fut} futures are about where they were at the close, so the ${m.short} (${m.desc}) is expected to open roughly unchanged.`
         : `${m.fut} futures are ${fmt(Math.abs(pts), pts >= 100 || pts <= -100 ? 0 : 1)} points ${dir === "up" ? "above" : "below"} where they were at the ${dateLabel(closeDate)} close. That points to the ${m.short} (${m.desc}) opening about ${fmt(Math.abs(pct), 2)}% ${dir === "up" ? "higher" : "lower"}, ${sizeWord(Math.abs(pct))}.`;
     }
 
     // Headline and explanation
-    const all = results;
+    const all = results.filter((r) => r.m.region !== "ca");
     const core = results.filter((r) => !r.m.proxy);
     const ups = core.filter((r) => r.pct >= 0.05), downs = core.filter((r) => r.pct <= -0.05);
     const sorted = [...core].sort((a, b) => a.pct - b.pct);
@@ -200,6 +229,8 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     else if (downs.length === n3) head = `Futures point to a lower open across the board.`;
     else if (ups.length === n3) head = `Futures point to a higher open across the board.`;
     else if (!ups.length && !downs.length) head = `Futures point to a roughly flat open.`;
+    else if (!ups.length) head = `Futures point to a mostly lower open.`;
+    else if (!downs.length) head = `Futures point to a mostly higher open.`;
     else head = `Futures point to a mixed open.`;
     $("headline").textContent = head;
 
@@ -226,7 +257,60 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     else if (mins != null) { t.className = "note warn"; t.textContent = `The market opens in ${Math.floor(mins / 60)} h ${mins % 60} min. Estimates this early often change. They become more reliable after about 8 a.m. Eastern, and most reliable in the last few minutes before 9:30.`; }
     else { t.className = "note warn"; t.textContent = `The next open is the next trading day at 9:30 a.m. Eastern. Overnight estimates often change, so check again closer to the open.`; }
 
-    $("meta").innerHTML = `<span>Futures prices as of ${etLabel(newestFut)} (about 10 minutes delayed)</span><span>Updated ${etLabel(now)}</span><span>Source: Yahoo Finance</span>`;
+    $("meta").innerHTML = `<span>Futures prices as of ${etLabel(newestFut)} (about 10 minutes delayed)</span><span>Updated ${etLabel(now)}</span><span>Sources: Yahoo Finance, Bank of Canada</span>`;
+    renderCanada(j, results.find((r) => r.k === "tsx"));
+  }
+
+  function renderCanada(j, tsx) {
+    const d = {}; (j.drivers || []).forEach((x) => (d[x.key] = x));
+    const move = (x) => (x && !x.error && isFinite(x.changePercent) ? x.changePercent : null);
+    const TH = { oil: 0.5, gas: 0.75, gold: 0.3, cad: 0.1 };
+    const why = {
+      oil: (p) => Math.abs(p) < TH.oil ? "Little effect on energy producers, a big part of the TSX." : p > 0 ? "Usually helps energy producers, a big part of the TSX." : "Usually weighs on energy producers, a big part of the TSX.",
+      gas: (p) => Math.abs(p) < TH.gas ? "Little effect on natural gas producers." : p > 0 ? "Usually helps natural gas producers." : "Usually weighs on natural gas producers.",
+      gold: (p) => Math.abs(p) < TH.gold ? "Little effect on gold miners." : p > 0 ? "Usually helps gold miners, which are well represented on the TSX." : "Usually weighs on gold miners, which are well represented on the TSX.",
+      cad: (p) => Math.abs(p) < TH.cad ? "The loonie is steady." : p > 0 ? "A stronger loonie often goes with firmer commodity prices." : "A weaker loonie often goes with softer commodity prices or a stronger US dollar.",
+    };
+    const price = { oil: (v) => "US$" + fmt(v, 2), gas: (v) => "US$" + fmt(v, 3), gold: (v) => "US$" + fmt(v, 0), cad: (v) => "US$" + fmt(v, 4) };
+    const items = ["oil", "gas", "gold", "cad"].map((k) => {
+      const x = d[k]; const p = move(x);
+      if (p == null) return `<li><span class="dname">${x ? x.name : k}</span><span class="dval">unavailable</span><span class="dwhy">This price couldn't be loaded.</span></li>`;
+      const cls = Math.abs(p) < TH[k] ? "" : p > 0 ? " up" : " down";
+      return `<li><span class="dname">${x.name}</span><span class="dval">${price[k](x.price)} <span class="pill${cls}">${sign(p)}${fmt(Math.abs(p), 2)}%</span></span><span class="dwhy">${why[k](p)}</span></li>`;
+    });
+    const b = j.canada10y;
+    if (b && !b.error && isFinite(b.value) && isFinite(b.prev)) {
+      const bp = Math.round((b.value - b.prev) * 100);
+      const txt = bp === 0 ? "Unchanged on the day." : bp > 0 ? "Higher yields tend to weigh on rate-sensitive stocks like utilities and real estate." : "Lower yields tend to help rate-sensitive stocks like utilities and real estate.";
+      items.push(`<li><span class="dname">Canada 10-year bond yield</span><span class="dval">${fmt(b.value, 2)}% <span class="pill">${bp >= 0 ? "+" : "−"}${Math.abs(bp)} bp</span></span><span class="dwhy">${txt} Bank of Canada close on ${dateLabel(b.date)}, compared with ${dateLabel(b.prevDate)}. This is daily data, not an overnight move. (1 bp = 0.01 percentage points.)</span></li>`);
+    } else {
+      items.push(`<li><span class="dname">Canada 10-year bond yield</span><span class="dval">unavailable</span><span class="dwhy">The Bank of Canada data couldn't be loaded.</span></li>`);
+    }
+    $("drivers").innerHTML = items.join("");
+
+    const NAME = { oil: "Oil", gas: "Natural gas", gold: "Gold" };
+    const moved = ["oil", "gas", "gold"].map((k) => [k, move(d[k])]).filter(([k, p]) => p != null && Math.abs(p) >= TH[k]);
+    const upL = moved.filter(([, p]) => p > 0), dnL = moved.filter(([, p]) => p < 0);
+    const upC = upL.length, dnC = dnL.length;
+    const names = (l) => l.map(([k, p]) => `${NAME[k].toLowerCase()} (${sign(p)}${fmt(Math.abs(p), 2)}%)`).join(" and ");
+    const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+    let comTxt;
+    if (!moved.length) comTxt = "Oil, natural gas and gold haven't moved much overnight.";
+    else if (upC && !dnC) comTxt = `${cap(names(upL))} ${upC > 1 ? "are" : "is"} up overnight, which usually supports the TSX.`;
+    else if (dnC && !upC) comTxt = `${cap(names(dnL))} ${dnC > 1 ? "are" : "is"} down overnight, which usually weighs on the TSX.`;
+    else comTxt = `Commodities are mixed: ${names(upL)} up, ${names(dnL)} down.`;
+
+    if (!tsx) { $("ca-headline").textContent = "TSX prices couldn't be loaded."; $("ca-explain").textContent = comTxt; return; }
+    if (tsx.openNow) { $("ca-headline").textContent = "The TSX is open."; $("ca-explain").textContent = comTxt + " Come back after the 4 p.m. Eastern close for the next estimate."; return; }
+    const usDir = tsx.pct >= 0.05 ? "higher" : tsx.pct <= -0.05 ? "lower" : "flat";
+    const comDir = upC > dnC ? "higher" : dnC > upC ? "lower" : "none";
+    $("ca-headline").textContent = usDir === "flat" ? "US futures point to a roughly flat TSX open." : `US futures point to a ${usDir} TSX open, about ${fmt(Math.abs(tsx.pct), 2)}%.`;
+    let tail;
+    if (comDir === "none" || usDir === "flat") tail = "There's no clear commodity signal pulling against the US futures, so they're the best guide.";
+    else if (comDir === usDir) tail = "That points the same way as US futures, which makes the estimate's direction more convincing.";
+    else if (usDir === "lower") tail = "That pulls against the weak US futures, so the TSX may hold up better than the estimate suggests.";
+    else tail = "That pulls against the strong US futures, so the TSX may lag what the estimate suggests.";
+    $("ca-explain").textContent = `${comTxt} ${tail}`;
   }
 
   async function load() {
