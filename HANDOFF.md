@@ -1,15 +1,16 @@
 # Handoff
 
-_Last updated: 2026-11-04 (9:31 open + holidays BUILT on branch `claude/upbeat-gauss-uj5t8y`, waiting for Matt's approval; NOT deployed, see "Built: 9:31 open and holidays")_
+_Last updated: 2026-11-04 (9:31 open + holidays approved by Matt and LIVE: relay v6, logger v4, PR #20 merged; see "Built: 9:31 open and holidays")_
 
 ## Start here (fresh session)
-- **Waiting on Matt (2026-11-04): approve the 9:31 open + holidays build** (screenshots and preview sent). After approval, in this order: (1) deploy relay `implied-open` (v6) and logger `implied-open-accuracy` (v4) from the branch, both with `verify_jwt: false`; (2) merge the PR (redeploys both sites); (3) check the live page and the next tick. See "Built: 9:31 open and holidays". If a question needs deep judgment (method soundness, data reliability, security, legal exposure), say so and suggest raising the effort first.
+- **9:31 open + holidays: LIVE since 2026-11-04** (Matt approved; relay `implied-open` v6 and logger `implied-open-accuracy` v4 deployed with `verify_jwt: false`, PR #20 merged). Matt said: leave the first printed open off the page. First real tests: Thu Nov 5 9:30-9:32 (opening state then 9:31 level), Nov 25-27 (Thanksgiving and the 1 p.m. close), Dec 24-29. See "Built: 9:31 open and holidays" and open item 0a. If a question needs deep judgment (method soundness, data reliability, security, legal exposure), say so and suggest raising the effort first.
+- **Matt's standing point (2026-11-04):** the goal is the most accurate prediction of where the market opens, not a flattering or "fair" yardstick. Judge any future change to the estimate (TSX model, Composite scale, faster pre-market prices) by whether it predicts the real open better, and check it against both the 9:31 level and the official open before adopting it.
 - **Contract-switch fix: LIVE since 2026-11-04** (Matt approved). Relay `implied-open` v5 and logger `implied-open-accuracy` v3 deployed; history Sep 14 – Nov 4 rebuilt. Page changes (tile order, fallback warning, contract-switch days counted on /accuracy) approved by Matt and merged to main (PR #17), so both sites redeployed. **First real test: Mon Dec 14, 2026** (switch to the March contract): check that morning that the page shows sensible numbers and no yellow "Data problem" note. See "Contract-switch fix" below.
 - **Public site:** https://implied-open.soesraider.com (friends, no login).
 - **Private site:** https://implied-open-pvt.soesraider.com (Matt only, emailed-code login, 30-day sessions). Adds the Montreal Exchange SXF-based TSX estimate.
 - **Accuracy tracker (2026-11-04):** live at https://implied-open.soesraider.com/accuracy, approved and merged by Matt. The logger collects every 5 minutes. Matt wants to look at it live and may ask for changes. At his request the default comparison is the official open (9:35 price is the alternative). See "Accuracy tracker" below.
 - **Open items:**
-  0. **Built 2026-11-04, waiting for approval:** the three changes in "Build brief: 9:31 open and holidays". Then the deploy steps above.
+  0. **Done 2026-11-04:** the three changes in "Build brief: 9:31 open and holidays" (approved, deployed, merged).
   0a. **Calendar checks (after deploy):** Wed Nov 25 evening: US cards say "next open Fri Nov 27", TSX says Thu Nov 26. Fri Nov 27 after 1 p.m.: cards say "Futures at that close (1:00 PM ET)"; check that the 1 p.m. price matches Yahoo's 5-minute ESZ26.CME bar ending 1:00 p.m. (first chance to confirm the early-close rule with 5-minute data). Fri Nov 27 morning: TSX card's futures line says "last price before that close". Dec 24, 28, 29 similarly. **Extend the holiday lists to 2028 by Nov 2027** (three copies: `site/index.html`, both functions).
   1. **Matt to send the permission email** to TMX Datalinx (marketdata@tmx.com), text in `notes/mx-permission-email.md` (already worded for a page that is live). Matt sends it himself; never send email on his behalf. If the Bourse says no, take the MX feed down (see "If the Bourse says no" below).
   2. **Evening check:** one weekday after 8 p.m. ET, confirm the private page's SXF number looks sensible (that m-x.ca's settlement has rolled to that day's). If it hasn't, widen the paused window in `private/sxf.js`.
@@ -77,7 +78,7 @@ _Last updated: 2026-11-04 (9:31 open + holidays BUILT on branch `claude/upbeat-g
 **Checks before showing Matt:** run the tracker numbers against an independent recomputation; `cd private && node build.mjs` passes; headless screenshots (desktop + phone, light/dark, simulated times: overnight, 9:30:30, 9:35, a holiday, an early-close afternoon); Cloudflare preview link. Deploy relay/logger only after Matt approves, then merge (redeploys both sites). Update README.md and this file.
 
 ## Built: 9:31 open and holidays (2026-11-04, branch `claude/upbeat-gauss-uj5t8y`)
-**Status:** code done and tested; summary() migration applied (additive); relay and logger NOT deployed; PR not merged. Waiting for Matt.
+**Status:** approved by Matt and live 2026-11-04: summary() migration applied, relay v6 and logger v4 deployed, PR #20 merged. Matt: keep the first printed open off the page.
 **Findings while building (told to Matt):**
 - **Early closes (Matt chose fix A).** On 1 p.m. close days futures trade until 1:15 p.m. and Yahoo's daily futures close is the ~1:15 price (hourly bars for Jul 3, Nov 28 and Dec 24, 2025: daily close = last price of the 1:00-1:15 bar in all 9 cases; that bar had real trading). Gap vs the 1:00 price: S&P 0-0.02%, NDX 0.01-0.02%, Dow 0.015-0.055%. Fix: the relay/logger take "futures at that close" from 5-minute bars at the close time (last bar ending by 1:00 p.m.) on early-close dates. Not yet verifiable with real 5-minute data (none in Yahoo's 60 days); first check Fri Nov 27.
 - **US-only holidays (same mechanism, not in the brief).** Yahoo has NO futures data for US holiday sessions (Labor Day 2026: nothing from Fri 4:55 p.m. to Tue 00:00, daily or 5-minute; same for MLK/Memorial/Juneteenth/Thanksgiving 2025-26 daily bars). The TSX trades on those days, so the next morning the old page would have thrown an error ("no ES futures price for <date>") and shown nothing. Now: if there's no daily futures bar for the close date, the reference is the last futures price before the TSX close (usually the evening before the holiday); the card labels it "last price before that close". The estimate after a US-only holiday is rougher for the TSX. Also, one card failing no longer blanks the whole page.
@@ -103,7 +104,7 @@ _Last updated: 2026-11-04 (9:31 open + holidays BUILT on branch `claude/upbeat-g
 - **Backend (live since 2026-11-04):** Edge Function `implied-open-accuracy` (verify_jwt false; GET = public summary, POST = needs Vault secret `implied_open_log_secret`). pg_cron job `implied-open-accuracy-tick` every 5 minutes. Schema `implied_open` (tables `snapshots`, `actuals`; functions `summary()`, `is_roll_day()`), not exposed through the API, RLS on, no grants. Setup SQL in `supabase/accuracy.sql`. Vault also holds `implied_open_log_url`.
 - **Rebuilt history:** target dates 2026-08-26 to 2026-11-04, about 9,000 snapshots per index, from Yahoo 60-day 5-minute futures bars. Checked 2026-11-04: formula verified on every row, and the previous close, futures reference and actual opens matched an independent Python recomputation on all 249 index-days. Yahoo revises a few old 5-minute bars, so totals across all rows can't match exactly.
 - **Results so far (45 clean days, vs 9:35 price; vs the official open the near-open S&P miss is also about 0.09%):** S&P 500 average miss 0.30% at 1:30 a.m., 0.20% at 5:30 a.m., 0.09% at 9:00–9:20 a.m. (direction right 96–98%; "no change" misses by 0.39%). Nasdaq-100 0.17–0.18% near the open, Dow 0.18%, Composite 0.21%, TSX stand-in 0.31% ("no change" 0.43%).
-- **Limits:** holidays have no open, so they have no rows; once the 9:31 build is deployed the logger also skips holidays when choosing which open a snapshot counts toward. The TSX uses the S&P 500 stand-in; SXF tracking was deferred by Matt (would need a logger on the private Cloudflare side, never Supabase).
+- **Limits:** holidays have no open, so they have no rows; the logger also skips holidays when choosing which open a snapshot counts toward (since 2026-11-04). The TSX uses the S&P 500 stand-in; SXF tracking was deferred by Matt (would need a logger on the private Cloudflare side, never Supabase).
 - **To check it's running:** `select status, count(*), max(start_time) from cron.job_run_details where jobid = (select jobid from cron.job where jobname='implied-open-accuracy-tick') group by 1;` and the page's "Latest live snapshot" line.
 
 ## Private SXF site
@@ -119,7 +120,7 @@ _Last updated: 2026-11-04 (9:31 open + holidays BUILT on branch `claude/upbeat-g
 ## Known limits
 - Yahoo Finance's chart feed is unofficial. If it breaks, the function needs updating.
 - Futures prices are about 10 minutes delayed.
-- Market holidays: handled by fixed lists through 2027 once the 9:31 build is deployed (until then, not handled). Extend before 2028.
+- Market holidays: handled by fixed lists through 2027. Extend before 2028.
 - The Composite estimate is a proxy.
 
 ## Hosting and deploys
