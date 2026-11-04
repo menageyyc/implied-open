@@ -1,8 +1,9 @@
 # Handoff
 
-_Last updated: 2026-11-04 (accuracy tracker live and merged)_
+_Last updated: 2026-11-04 (end of accuracy-tracker session; next up: contract-switch fix)_
 
 ## Start here (fresh session)
+- **Next task: fix the futures contract-switch bug before Dec 15, 2026.** Matt approved it. Full brief in "Next session: contract-switch fix" below. Also be ready for Matt's feedback on the live accuracy page.
 - **Public site:** https://implied-open.soesraider.com (friends, no login).
 - **Private site:** https://implied-open-pvt.soesraider.com (Matt only, emailed-code login, 30-day sessions). Adds the Montreal Exchange SXF-based TSX estimate.
 - **Accuracy tracker (2026-11-04):** live at https://implied-open.soesraider.com/accuracy, approved and merged by Matt. The logger collects every 5 minutes. Matt wants to look at it live and may ask for changes. At his request the default comparison is the official open (9:35 price is the alternative). See "Accuracy tracker" below.
@@ -12,6 +13,29 @@ _Last updated: 2026-11-04 (accuracy tracker live and merged)_
   2. **Evening check:** one weekday after 8 p.m. ET, confirm the private page's SXF number looks sensible (that m-x.ca's settlement has rolled to that day's). If it hasn't, widen the paused window in `private/sxf.js`.
   3. Optional, offered to Matt: "Sign in with Google" instead of the emailed code (needs a Google Cloud OAuth client, ~15 min with Matt). Optional: rename the Zero Trust team `small-credit-1e44`.
 - **Hard rules:** MX data must never be reachable without logging in (page, `/api/sxf`, any preview or deployment link). Never put the MX fetch in the public Supabase function or in `site/`. Never create a top-level `functions/` folder (the public Pages project would serve it).
+
+## Next session: contract-switch fix
+**Problem.** The page and the accuracy logger use Yahoo's continuous futures symbols (`ES=F`, `NQ=F`, `YM=F`). The formula is implied = last cash close + (futures now − futures "at that close"). "Futures now" is the live price (`meta.regularMarketPrice`); "futures at that close" is the **daily bar** close for the close date. Around each quarterly expiry, Yahoo's intraday/live series switches to the next contract days before its daily series does, so the page subtracts the old contract's close from the new contract's price. The new contract trades higher (about +65 S&P points in Sep 2026), so the estimate runs about 0.8–1.1% too high.
+
+**Evidence (checked 2026-11-04, Yahoo 60-day data):** `ES=F` 5-minute bars at 4:00 p.m. sat about 7 points above the S&P 500 cash close through Fri Sep 11, then about 70 points above from Mon Sep 14. The daily bars stayed on the September contract (about +2 to +7) until Fri Sep 18 and switched on Mon Sep 21. Rebuilt S&P 500 estimates (futures price at 9:20 a.m., vs 9:35 price) missed by +1.09%, +0.93%, +1.13%, +0.75% and +0.80% on Sep 15, 16, 17, 18 and 21. Normal days miss by about 0.03–0.18%. NQ and YM show the same pattern.
+
+**Next risk:** the December contract expires Fri Dec 18, 2026, so roughly Dec 14–21. March 2027 expires Fri Mar 19.
+
+**Where the formula lives (change all of them in step):**
+1. `site/index.html`, `render()`: `fRef = p.future.bars.find(... date === closeDate)` and `fNow = p.future.price`.
+2. `supabase/functions/implied-open/index.ts` (the relay): fetches `ES=F`/`NQ=F`/`YM=F` with `range=5d&interval=1d`. Keep `verify_jwt: false` and a fixed symbol list.
+3. `supabase/functions/implied-open-accuracy/index.ts` (the logger): `implied()` copies the page's formula, and `tick()` fetches the same symbols. If the page changes, the logger must change the same way, or the tracker stops measuring what the page shows.
+4. The private site builds from `site/`, so it picks up page changes. `private/build.mjs` fails the build if its hook strings in `site/index.html` change, so run `cd private && node build.mjs` before merging.
+
+**Fix options (verify before choosing):**
+- **A (preferred): explicit contracts.** Request the specific quarterly contract, chosen by date, for both the live price and the reference close, e.g. `ESZ26.CME` (codes: H=Mar, M=Jun, U=Sep, Z=Dec). Roll to the next contract on a fixed rule, e.g. the Monday of expiry week, about when volume moves. **Not yet verified:** that Yahoo serves these symbols (try `.CME` for ES/NQ and `.CBT` for YM), with daily closes and a live price. If it works, the reference and the live price always come from the same contract.
+- **B (fallback): same-series reference.** Take "futures at that close" from the intraday series at 4:00 p.m. ET on the close date (`interval=5m`), not the daily bar. This fixes most of the window. It still breaks for the one session in which the live series itself switches, unless Yahoo re-stitches history.
+- Either way, the page could show a small "futures contract switch this week" note during the window.
+
+**How to test:**
+- Rebuild Sep 2026 with the new method and compare. The S&P misses on Sep 15–21 should fall to normal size (about 0.1–0.2%) without hurting other days. The logger's `backfill` action (POST with the Vault secret, e.g. `{"action":"backfill","key":"spx","from":"2026-09-01","to":"2026-09-30"}`, one index and about two weeks per call, triggered from SQL with `net.http_post` as in `supabase/accuracy.sql`) can rebuild history once it uses the new method. Futures 5-minute history only goes back 60 days (Sep 2026 drops out around Nov 25), so do this soon, or test against the next roll.
+- After the fix, decide with Matt whether contract-switch days should still be left out of the accuracy averages (`implied_open.is_roll_day()` in the database, checkbox on the page). Rows rebuilt with the old method for Sep 15–21 are still in `implied_open.snapshots`; re-running backfill for those dates overwrites them, because backfill rows are replaced unless a live row exists.
+- Show Matt screenshots and the Cloudflare preview (`https://<branch>.implied-open.pages.dev`) before merging. Merging to main redeploys both sites.
 
 ## Status
 - The data relay is deployed and working: Supabase project "Menage", Edge Function `implied-open`, version 4 (adds the Canada data). It covers four US indexes plus the TSX, including the Nasdaq Composite (it uses NQ futures as a stand-in).
