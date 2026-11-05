@@ -63,9 +63,10 @@ th.n { text-align: right; }
     <h2>How the estimate is made</h2>
     <ul>
       <li><strong>Implied open = last close + how far the futures have moved since that close.</strong> Futures used: E-mini S&amp;P 500, E-mini Nasdaq-100, Mini Dow and E-mini Russell 2000.</li>
-      <li>The Nasdaq Composite and the TSX have no free futures feed, so they borrow the Nasdaq-100 and S&amp;P 500 moves. Treat those two as rougher.</li>
+      <li>The TSX uses S&amp;P/TSX 60 futures (SXF) from the Montréal Exchange, in real time: their move since the last settlement, applied to the TSX's last close. The TSX 60 is the 60 biggest Canadian companies and moves almost exactly with the full TSX. From 4 to 8 p.m. Eastern on weekdays, or if the exchange's prices can't be loaded, the page falls back to the S&amp;P 500 futures move and says so; that stand-in is rougher.</li>
+      <li>The Nasdaq Composite has no futures of its own, so it borrows the Nasdaq-100 move. Treat it as rougher.</li>
       <li>Quarterly contract rolls, market holidays and 1 p.m. early closes are handled automatically.</li>
-      <li>Prices come from Yahoo Finance; futures run about 10 minutes behind. The page refreshes every minute.</li>
+      <li>US prices come from Yahoo Finance; its futures run about 10 minutes behind. SXF prices come from the Montréal Exchange. The page refreshes every minute.</li>
     </ul>
   </section>
 
@@ -95,10 +96,11 @@ th.n { text-align: right; }
           <tr><td>Nasdaq-100</td><td class="n">0.14%</td><td class="n">96%</td></tr>
           <tr><td>Dow</td><td class="n">0.18%</td><td class="n">94%</td></tr>
           <tr><td>Nasdaq Composite</td><td class="n">0.20%</td><td class="n">92%</td></tr>
-          <tr><td>S&amp;P/TSX</td><td class="n">0.29%</td><td class="n">84%</td></tr>
+          <tr><td>S&amp;P/TSX (S&amp;P 500 stand-in)</td><td class="n">0.29%</td><td class="n">84%</td></tr>
         </tbody>
       </table>
     </div>
+    <p>The TSX figure is for the old S&amp;P 500 stand-in. The SXF-based TSX estimate has been tracked since Nov 5, 2026; its numbers are on the <a href="/accuracy">track record</a> page as they build up.</p>
     <p>For comparison, assuming the market opens unchanged misses by 0.4–0.7% on average. Estimates in the small hours are rougher: about 0.3% for the S&amp;P 500 at 1:30 a.m. <a href="/accuracy">Day-by-day track record</a>.</p>
   </section>
 

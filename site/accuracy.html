@@ -124,6 +124,7 @@ tr.hl td { font-weight: 500; }
     <p><strong>The estimate.</strong> Exactly the main page's calculation (last close + the futures move since that close), saved every 5 minutes from 6 p.m. Eastern the evening before until 9:30 a.m.</p>
     <p><strong>Times are futures-price times.</strong> Yahoo's futures prices run about 10 minutes behind, so each estimate is filed under the time of the futures price it used, not the clock time. For example, the "9:20 a.m." estimate is what the page showed at about 9:30.</p>
     <p><strong>The actual open.</strong> When the market opens at 9:30, many stocks take a few seconds or minutes to make their first trade. The index's official opening number is worked out straight away, so for those stocks it still uses yesterday's closing prices, and it usually shows only part of the real move (for the Dow, often only about half). The index level at 9:31, after the first full minute of trading, is the first number that reflects nearly every stock, so it's the yardstick for the US indexes. The TSX gets going more slowly, so it's compared with its level at 9:35. You can switch between the 9:31 level, the 9:35 level and the official open with "Compare with". Yahoo keeps minute-by-minute prices for only about a month, so days before Oct 6, 2026 have no 9:31 level and use 9:35 instead (marked "9:35" in the table).</p>
+    <p><strong>Two TSX estimates.</strong> "TSX (SXF)" is the main page's TSX estimate since Nov 5, 2026: the move in Montréal Exchange S&amp;P/TSX 60 futures (SXF) since their last settlement, applied to the TSX's last close. It's saved live only (there's no SXF history to rebuild), so its record starts on Nov 5, 2026, and it's not saved 4 to 8 p.m. Eastern on weekdays, when the page pauses it. "TSX (S&amp;P stand-in)" is the older estimate, which applies the S&amp;P 500 futures move to the TSX. The page now uses it only when SXF isn't available; it's kept here for comparison.</p>
     <p><strong>The "no change" guess</strong> assumes the index opens exactly at the previous close. An estimate is only useful if it beats that.</p>
     <p><strong>Rebuilt history.</strong> Days before Nov 4, 2026 were rebuilt from Yahoo's 5-minute futures history using the same formula (marked "rebuilt"). From Nov 4, 2026 on, the estimates are saved live as the page would show them.</p>
     <p><strong>Futures contract-switch days.</strong> Each quarter (March, June, September, December) the futures roll to the next contract, which trades at a different price. Until November 2026, Yahoo's data mixed the two contracts for a few days around the switch and the estimate could be off by close to 1%. The page and this tracker now use one specific contract throughout, and the September 2026 days were rebuilt that way, so these days (Tuesday of expiry week through the following Monday) are counted like any other. They still show in grey on the day-by-day chart, and you can untick the box to leave them out.</p>
@@ -134,11 +135,11 @@ tr.hl td { font-weight: 500; }
 <script>
 (function () {
   const API = "https://awagbieeouxxhytdhloi.supabase.co/functions/v1/implied-open-accuracy";
-  const KEYS = [["spx", "S&P 500"], ["ndx", "Nasdaq-100"], ["ixic", "Nasdaq Composite"], ["dji", "Dow"], ["rut", "Russell 2000"], ["tsx", "S&P/TSX"]];
+  const KEYS = [["spx", "S&P 500"], ["ndx", "Nasdaq-100"], ["ixic", "Nasdaq Composite"], ["dji", "Dow"], ["rut", "Russell 2000"], ["tsxsxf", "TSX (SXF)"], ["tsx", "TSX (S&P stand-in)"]];
   // m = level at 9:31 (close of the first full minute), p = price at 9:35, o = official (first printed) open.
   // The TSX opens more slowly, so it defaults to 9:35; the US indexes default to 9:31.
   const CMP = [["m", "Level at 9:31"], ["p", "Price at 9:35"], ["o", "Official open"]];
-  const CMP_DEFAULT = { tsx: "p" };
+  const CMP_DEFAULT = { tsx: "p", tsxsxf: "p" };
   const cmpDefault = (k) => CMP_DEFAULT[k] || "m";
   const GLANCE = [480, 240, 30, 20, 10, 0];
   const DAYH = [480, 240, 30, 20, 10];

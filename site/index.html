@@ -147,8 +147,10 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     ndx: { short: "Nasdaq-100", name: "Nasdaq-100", fut: "NQ" },
     ixic: { short: "Nasdaq Composite", name: "Composite", fut: "NQ", proxy: true,
       note: (p) => `No futures trade on the Composite, so this applies the Nasdaq-100 futures move (${p}) as a stand-in. Treat it as rougher than the others.` },
+    // TSX: main estimate from Montréal Exchange SXF (S&P/TSX 60 futures, fetched from this site's own /api/sxf);
+    // the S&P 500 futures move is only the fallback when SXF is paused or unavailable.
     tsx: { short: "S&P/TSX Composite", name: "TSX", fut: "ES", proxy: true, region: "ca",
-      note: (p) => `There's no free feed for Canadian index futures, so this applies the S&P 500 futures move (${p}) as a stand-in. A rough guide: check the drivers.` },
+      note: (p, why) => `${why}, so this applies the S&P 500 futures move (${p}) as a stand-in. Rougher than SXF: check the drivers.` },
   };
   const $ = (id) => document.getElementById(id);
   const fmt = (n, d = 2) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -241,17 +243,37 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     return null;
   }
 
+  // ---------- TSX from SXF (Montréal Exchange S&P/TSX 60 futures) ----------
+  // Move since SXF's last settlement, applied to the TSX's last close. Price = bid/ask midpoint when the
+  // spread is under 0.5%, otherwise the last trade. Paused 4 to 8 p.m. Eastern on weekdays: SXF stops at
+  // 4:30 p.m. and restarts at 8 p.m., and in between its settlement and the TSX close can be from different days.
+  const monthLabel = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+  function sxfEstimate(sx, close, n) {
+    if (isWeekday(n.wd) && n.mins >= 960 && n.mins < 1200)
+      return { why: "SXF is paused from 4 to 8 p.m. Eastern on weekdays (its settlement and the TSX close can be from different days)" };
+    if (!sx || sx.error || !sx.front) return { why: "Montréal Exchange prices couldn't be loaded right now" };
+    const f = sx.front;
+    let px = null, how = "";
+    if (f.bid > 0 && f.ask > 0 && f.ask >= f.bid && (f.ask - f.bid) / ((f.ask + f.bid) / 2) < 0.005) { px = (f.bid + f.ask) / 2; how = "bid/ask midpoint"; }
+    else if (f.last > 0) { px = f.last; how = "last trade"; }
+    if (!px || !(f.settlement > 0)) return { why: "SXF has no usable price right now" };
+    const pct = (px / f.settlement - 1) * 100;
+    // SXF trades Sunday to Friday, 8 p.m. Eastern to 4:30 p.m. the next day.
+    const trading = (n.wd !== "Fri" && n.wd !== "Sat" && n.mins >= 1200) || (isWeekday(n.wd) && n.mins < 990);
+    return { ok: true, f, px, how, pct, pts: close * pct / 100, implied: close * (1 + pct / 100), trading };
+  }
+
   function buildCards() {
     const html = (rows) => rows.map(([k, m]) => `
       <article class="card" id="card-${k}">
-        <h3>${m.short}<span>${m.proxy ? "uses " + m.fut + " futures" : m.fut + " futures"}</span></h3>
+        <h3>${m.short}<span${k === "tsx" ? ' id="tsx-src"' : ""}>${m.proxy ? "uses " + m.fut + " futures" : m.fut + " futures"}</span></h3>
         <div><div class="label" id="lab-${k}">Implied open</div><div class="big" id="open-${k}">—</div></div>
         <div class="pill" id="chg-${k}">—</div>
         <p id="plain-${k}"></p>
         <dl>
           <dt id="cl-${k}">Last close</dt><dd id="close-${k}">—</dd>
           <dt id="frl-${k}">${m.proxy ? m.fut + " futures" : "Futures"} at that close</dt><dd id="fref-${k}">—</dd>
-          <dt>${m.proxy ? m.fut + " futures" : "Futures"} now</dt><dd id="fnow-${k}">—</dd>
+          <dt id="fnl-${k}">${m.proxy ? m.fut + " futures" : "Futures"} now</dt><dd id="fnow-${k}">—</dd>
         </dl>
       </article>`).join("");
     const rows = Object.entries(META);
@@ -266,7 +288,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     return dir;
   }
 
-  function render(j) {
+  function render(j, sx) {
     const now = j.fetchedAt, n = et(now);
     const results = [];
     let marketOpen = false, opening = false, firstPrint = false, newestFut = 0;
@@ -293,9 +315,16 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
         pct = m.proxy ? (fPts / fRef) * 100 : (fPts / closeBar.close) * 100;
         pts = m.proxy ? closeBar.close * pct / 100 : fPts; implied = closeBar.close + pts;
       }
-      newestFut = Math.max(newestFut, p.future.time * 1000);
+      if (m.region !== "ca") newestFut = Math.max(newestFut, p.future.time * 1000);
       const target = targetOf(cal, n);
-      results.push({ k: p.key, m, cal, close: closeBar.close, closeDate, fRef, fNow, pts, implied, pct, openNow, target, todayOpen: openNow ? last.open : null });
+      // TSX: SXF is the main estimate; the S&P 500 stand-in (pct above) is the fallback.
+      const standPct = pct;
+      // (Also while the TSX is open: the "Opening now · last estimate" moment shows the last SXF estimate.)
+      const s = p.key === "tsx" ? sxfEstimate(sx, closeBar.close, n) : null;
+      if (s && s.ok) ({ pts, pct, implied } = s);
+      results.push({ k: p.key, m, cal, close: closeBar.close, closeDate, fRef, fNow, pts, implied, pct, openNow, target, todayOpen: openNow ? last.open : null,
+        src: s && s.ok ? "sxf" : "stand-in", standPct, sxf: s });
+      if (p.key === "tsx") $("tsx-src").textContent = openNow ? "" : s && s.ok ? "SXF futures" : "stand-in: ES futures";
 
       const fName = m.proxy ? m.fut + " futures" : "Futures";
       $(`cl-${p.key}`).textContent = `Last close (${dateLabel(closeDate)}${closeMin(cal, closeDate) === 780 ? ", 1 p.m. early close" : ""})`;
@@ -307,6 +336,13 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
         : `${fName}, last price before that close (${etLabel(ref.time * 1000)})`;
       $(`fref-${p.key}`).textContent = fRef == null ? "unavailable" : fmt(fRef);
       $(`fnow-${p.key}`).textContent = fmt(fNow);
+      $(`fnl-${p.key}`).textContent = `${fName} now`;
+      if (s && s.ok) {
+        $(`frl-${p.key}`).textContent = `SXF settlement (${monthLabel(s.f.expiry)} contract)`;
+        $(`fref-${p.key}`).textContent = fmt(s.f.settlement, 1);
+        $(`fnl-${p.key}`).textContent = `SXF now (${s.how})`;
+        $(`fnow-${p.key}`).textContent = fmt(s.px);
+      }
 
       if (openNow) {
         const a = p.index.at931;
@@ -336,7 +372,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
         }
         continue;
       }
-      if (fRef == null) {
+      if (fRef == null && !(s && s.ok)) {
         $(`lab-${p.key}`).textContent = "Implied open";
         $(`open-${p.key}`).textContent = "—";
         $(`chg-${p.key}`).className = "pill"; $(`chg-${p.key}`).textContent = "—";
@@ -348,8 +384,10 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
       $(`lab-${p.key}`).textContent = "Implied open" + nextOpen;
       $(`open-${p.key}`).textContent = fmt(implied);
       // The pill and the three lines below already give the points, % and futures prices; the sentence says how big the move is.
-      $(`plain-${p.key}`).textContent = m.proxy
-        ? `${m.note(sign(pct) + fmt(Math.abs(pct), 2) + "%")} ${sizeLine(Math.abs(pct), p.key, m.name, { short: true })}`
+      $(`plain-${p.key}`).textContent = s && s.ok
+        ? sizeLine(Math.abs(pct), p.key, m.name) + (s.trading ? "" : " SXF isn't trading right now (weekend or overnight break), so these are its last prices.")
+        : m.proxy
+        ? `${m.note(sign(pct) + fmt(Math.abs(pct), 2) + "%", s ? s.why : undefined)} ${sizeLine(Math.abs(pct), p.key, m.name, { short: true })}`
         : sizeLine(Math.abs(pct), p.key, m.name);
     }
 
@@ -415,7 +453,7 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     else if (mins != null) { t.className = "note warn"; t.textContent = `${calNote}The market opens in ${Math.floor(mins / 60)} h ${mins % 60} min. Estimates this early often change. They become more reliable after about 8 a.m. Eastern, and most reliable in the last few minutes before 9:30.`; }
     else { t.className = "note warn"; t.textContent = `${calNote}${nextTxt} Overnight estimates often change, so check again closer to the open.`; }
 
-    $("meta").innerHTML = `<span>Futures prices as of ${etLabel(newestFut)} (about 10 minutes delayed)</span><span>Updated ${etLabel(now)}</span><span>Sources: Yahoo Finance, Bank of Canada, Government of Alberta</span>`;
+    $("meta").innerHTML = `<span>Futures prices as of ${etLabel(newestFut)} (about 10 minutes delayed)</span><span>Updated ${etLabel(now)}</span><span>Sources: Yahoo Finance, Montréal Exchange (SXF, real time), Bank of Canada, Government of Alberta</span>`;
     renderContext(j);
     renderCanada(j, results.find((r) => r.k === "tsx"));
   }
@@ -537,12 +575,18 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
     let calTxt = "";
     if (CAL.ca.closed[n.date]) calTxt = ` The TSX is closed today for ${CAL.ca.closed[n.date]}, so this is for its next open, ${dateLabel(tsx.target)}.`;
     else if (CAL.ca.early[n.date] && n.mins >= 780 && !tsx.openNow) calTxt = ` The TSX closed early today, at 1 p.m. Eastern (${CAL.ca.early[n.date]}), so this is for its next open, ${dateLabel(tsx.target)}.`;
-    else if (CAL.us.closed[n.date] && isTradingDay("ca", n.date) && !tsx.openNow) calTxt = ` US markets are closed today for ${CAL.us.closed[n.date]}, but the TSX is open. Yahoo shows no US futures trading on US holidays, so the stand-in uses the last futures price from before the holiday.`;
+    else if (CAL.us.closed[n.date] && isTradingDay("ca", n.date) && !tsx.openNow && tsx.src !== "sxf") calTxt = ` US markets are closed today for ${CAL.us.closed[n.date]}, but the TSX is open. Yahoo shows no US futures trading on US holidays, so the stand-in uses the last futures price from before the holiday.`;
     const later = holidaysBefore("ca", n, tsx.target).filter((d) => d !== n.date);
     if (later.length) calTxt += ` The TSX is ${CAL.ca.closed[n.date] ? "also " : ""}closed ${later.map((d) => `${dateLabel(d)} for ${CAL.ca.closed[d]}`).join(" and ")}.`;
     if (tsx.openNow) { $("ca-headline").textContent = "The TSX is open."; $("ca-explain").textContent = comTxt + ` Come back after the ${closeLabel("ca", n.date)} Eastern close for the next estimate.` + calTxt; return; }
     if (tsx.pct == null) { $("ca-headline").textContent = "There's no TSX estimate right now."; $("ca-explain").textContent = comTxt + calTxt; return; }
     const usDir = tsx.pct >= 0.05 ? "higher" : tsx.pct <= -0.05 ? "lower" : "flat";
+    if (tsx.src === "sxf") {
+      // SXF trades Canadian stocks directly, so it already prices in the commodity moves listed.
+      $("ca-headline").textContent = usDir === "flat" ? "TSX 60 futures point to a roughly flat TSX open." : `TSX 60 futures point to a ${usDir} TSX open, about ${fmt(Math.abs(tsx.pct), 2)}%.`;
+      $("ca-explain").textContent = `${comTxt} SXF futures trade on Canadian stocks directly, so they already reflect moves like these.${calTxt}`;
+      return;
+    }
     const comDir = upC > dnC ? "higher" : dnC > upC ? "lower" : "none";
     $("ca-headline").textContent = usDir === "flat" ? "US futures point to a roughly flat TSX open." : `US futures point to a ${usDir} TSX open, about ${fmt(Math.abs(tsx.pct), 2)}%.`;
     let tail;
@@ -556,11 +600,15 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
   async function load() {
     const b = $("refresh"); b.disabled = true; b.textContent = "Refreshing…";
     try {
+      // SXF comes from this site's own /api/sxf (same-origin only); a failure just means the TSX stand-in.
+      const sxP = fetch("/api/sxf", { cache: "no-store" })
+        .then((r) => r.json().catch(() => ({ error: "unexpected answer (" + r.status + ")" })))
+        .catch(() => ({ error: "network error" }));
       const res = await fetch(RELAY, { cache: "no-store" });
       if (!res.ok) throw new Error("the price service answered with an error (" + res.status + ")");
       const j = await res.json();
       if (j.error) throw new Error(j.error);
-      render(j);
+      render(j, await sxP);
     } catch (e) {
       $("headline").textContent = "Prices couldn't be loaded right now.";
       $("explain").textContent = `Reason: ${e.message || "network error"}. The page will try again in a minute, or press Refresh.`;

@@ -12,6 +12,14 @@
 //                                   in [from, to] (run in small ranges to stay within limits). The 9:31
 //                                   level is filled only where Yahoo still has 1-minute data (~30 days).
 //
+// TSX via SXF (key "tsxsxf", from 2026-11): live only (no SXF history to backfill). Each tick reads the
+// SXF quote from the public site's own /api/sxf (so the Montréal Exchange fetch stays in one place),
+// passing the Vault secret implied_open_sxf_key in the x-sxf-key header. Same formula as the page.
+// The actual opens for "tsxsxf" are copies of the "tsx" ones (same index). The S&P 500 stand-in ("tsx")
+// keeps being logged for comparison.
+// Also saves oil, gold, the loonie and copper (table implied_open.prices) at each tick outside US cash
+// hours, for a possible later TSX "driver model" (Yahoo keeps only ~60 days of 5-minute history).
+//
 // Data lives in the database schema implied_open (not exposed through the API). Symbols are
 // fixed, there is no user input to fetch, so this can't be used as a proxy.
 // Deployed to Supabase project "Menage" with verify_jwt = false (the page calls GET without a key).
@@ -28,6 +36,8 @@ const PAIRS = [
 const EXCHANGE: Record<string, string> = { ES: "CME", NQ: "CME", YM: "CBT", RTY: "CME" };
 type Pair = typeof PAIRS[number];
 
+const SXF_URL = "https://implied-open.soesraider.com/api/sxf";
+const PRICE_SYMBOLS = ["CL=F", "GC=F", "CADUSD=X", "HG=F"]; // WTI, gold, Canadian dollar (US$), copper
 const OPEN_MIN = 570; // 9:30 a.m.
 const MAX_HORIZON = 930; // from 6 p.m. ET the evening before (when futures reopen)
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS", "Access-Control-Allow-Headers": "*" };
@@ -224,6 +234,51 @@ async function saveActuals(rows: Record<string, unknown>[]) {
   return ok.length;
 }
 
+// TSX via SXF: one snapshot per tick, like the page (move since SXF's settlement applied to the TSX close;
+// bid/ask midpoint when the spread is under 0.5%, else the last trade). Not 4 to 8 p.m. ET on weekdays,
+// when the settlement and the TSX close can be from different days (the page pauses then too).
+async function sxfSnapshot(now: number, get: ReturnType<typeof makeGetter>, notes: string[]) {
+  const n = et(now);
+  if (!isWeekend(n.wd) && n.mins >= 960 && n.mins < 1200) { notes.push("tsxsxf: paused 4-8 p.m."); return null; }
+  const slot = Math.floor(now / 300000) * 300000;
+  const t = targetFor(slot, "ca");
+  if (!t) { notes.push("tsxsxf: outside the snapshot window"); return null; }
+  const [row] = await sql`select decrypted_secret as s from vault.decrypted_secrets where name = 'implied_open_sxf_key'`;
+  if (!row?.s) { notes.push("tsxsxf: no implied_open_sxf_key in Vault"); return null; }
+  const res = await fetch(SXF_URL, { headers: { "x-sxf-key": row.s as string, "User-Agent": "implied-open-accuracy" } });
+  if (!res.ok) { notes.push(`tsxsxf: /api/sxf HTTP ${res.status}`); return null; }
+  const f = (await res.json())?.front;
+  let px: number | null = null;
+  if (f?.bid > 0 && f?.ask > 0 && f.ask >= f.bid && (f.ask - f.bid) / ((f.ask + f.bid) / 2) < 0.005) px = (f.bid + f.ask) / 2;
+  else if (f?.last > 0) px = f.last;
+  if (!px || !(f?.settlement > 0)) { notes.push("tsxsxf: no usable SXF price"); return null; }
+  const idx = await get("^GSPTSE", "5d", "1d");
+  const closeBar = lastClose(idx.bars, t.target);
+  if (!closeBar) { notes.push("tsxsxf: missing close"); return null; }
+  const pct = (px / f.settlement - 1) * 100;
+  return { target_date: t.target, key: "tsxsxf", horizon_min: t.horizon, data_time: new Date(slot), implied: closeBar.close * (1 + pct / 100), pct,
+    prev_close: closeBar.close, close_date: closeBar.d, fut_ref: f.settlement, fut_now: px, source: "live" };
+}
+
+// Oil, gold, loonie, copper: latest 5-minute price of each, one Yahoo request. Saved outside US cash
+// hours on trading weeks (overnight moves and the 4 p.m. reference are what a driver model would need).
+async function savePrices(now: number, notes: string[]) {
+  const n = et(now);
+  const skip = n.wd === "Sat" || (n.wd === "Sun" && n.mins < 17 * 60) || (n.wd === "Fri" && n.mins >= 17 * 60) || (!isWeekend(n.wd) && n.mins > 575 && n.mins < 955);
+  if (skip) return 0;
+  const res = await fetch(`https://query1.finance.yahoo.com/v8/finance/spark?symbols=${encodeURIComponent(PRICE_SYMBOLS.join(","))}&range=1d&interval=5m`, { headers: { "User-Agent": "Mozilla/5.0" } });
+  if (!res.ok) { notes.push(`prices: HTTP ${res.status}`); return 0; }
+  const j = await res.json();
+  const slot = new Date(Math.floor(now / 300000) * 300000);
+  const rows: Record<string, unknown>[] = [];
+  for (const s of PRICE_SYMBOLS) {
+    const ts: number[] = j?.[s]?.timestamp ?? [], cl: (number | null)[] = j?.[s]?.close ?? [];
+    for (let i = ts.length - 1; i >= 0; i--) if (cl[i] != null) { rows.push({ slot, symbol: s, price: cl[i], price_time: new Date(Math.min((ts[i] + 300) * 1000, now)) }); break; }
+  }
+  if (rows.length) await sql`insert into implied_open.prices ${sql(rows, ["slot", "symbol", "price", "price_time"])} on conflict (slot, symbol) do nothing`;
+  return rows.length;
+}
+
 async function tick() {
   const now = Date.now(), n = et(now), get = makeGetter();
   const out: Record<string, unknown> = { at: new Date(now).toISOString() };
@@ -262,7 +317,9 @@ async function tick() {
       snaps.push({ target_date: t.target, key: p.key, horizon_min: t.horizon, data_time: new Date(ms), ...r, source: "live" });
     } catch (e) { notes.push(`${p.key}: ${(e as Error).message}`); }
   }
+  try { const s = await sxfSnapshot(now, get, notes); if (s) snaps.push(s); } catch (e) { notes.push(`tsxsxf: ${(e as Error).message}`); }
   if (snaps.length) await saveSnapshots(snaps);
+  try { out.prices = await savePrices(now, notes); } catch (e) { notes.push(`prices: ${(e as Error).message}`); }
   out.snapshots = snaps.length; out.notes = notes;
   // Actual opens: weekdays 9:40-10:30 a.m. and once after the close (as a backup).
   if (!isWeekend(n.wd) && ((n.mins >= 580 && n.mins <= 630) || (n.mins >= 990 && n.mins < 1000))) {
@@ -271,7 +328,10 @@ async function tick() {
       try {
         const [d, f, o] = await Promise.all([get(p.index, "5d", "1d"), get(p.index, "5d", "5m"),
           get(p.index, "1d", "1m").catch(() => ({ bars: [] as Bar[] }))]);
-        saved += await saveActuals(actualsFrom(p.key, d.bars, f.bars, o.bars));
+        const rows = actualsFrom(p.key, d.bars, f.bars, o.bars);
+        saved += await saveActuals(rows);
+        // TSX via SXF is measured against the same TSX opens.
+        if (p.key === "tsx") saved += await saveActuals(rows.map((r) => ({ ...r, key: "tsxsxf" })));
       } catch (e) { notes.push(`${p.key} actuals: ${(e as Error).message}`); }
     }
     out.actuals = saved;
