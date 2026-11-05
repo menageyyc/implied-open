@@ -317,7 +317,8 @@ tr.hl td { font-weight: 500; }
     $("glance-h").textContent = `At a glance: ${keyName()}`;
     const used = rows.filter((d) => state.roll || !d.roll), nfb = used.filter((d) => d.fb).length;
     $("glance-sub").textContent = `${counted} trading day${counted === 1 ? "" : "s"} counted, compared with ${cmpName()}${state.roll ? ", contract-switch days included" : ""}.` +
-      (nfb ? ` ${counted - nfb} of them have a 9:31 level; the other ${nfb}, before Oct 6, 2026, use the level at 9:35 instead (Yahoo keeps minute-by-minute prices for only about a month).` : "");
+      (nfb ? ` ${counted - nfb} of them have a 9:31 level; the other ${nfb}, before Oct 6, 2026, use the level at 9:35 instead (Yahoo keeps minute-by-minute prices for only about a month).` : "") +
+      (counted < 20 ? ` Only ${counted} day${counted === 1 ? "" : "s"} so far, which is too few to judge: percentages like "100% right" can swing a lot until about 20 days are counted.` : "");
     let html = `<thead><tr><th>Futures price at</th><th>Average miss</th><th>Average miss (points)</th><th>"No change" missed by</th><th>Right direction</th><th>Closer than "no change"</th></tr></thead><tbody>`;
     for (const h of GLANCE) {
       const s = stats(rows, h);
