@@ -372,6 +372,19 @@ dd { margin: 0; text-align: right; font-family: var(--mono); font-variant-numeri
         }
         continue;
       }
+      // The market is open but Yahoo hasn't published today's first bar for this index yet (the Russell 2000
+      // runs about 15 minutes behind): keep it labelled as the last estimate, not as a pre-open "Implied open".
+      if (isTradingDay(cal, n.date) && lastDate !== n.date && n.mins >= 570 && n.mins < closeM && implied != null) {
+        setPill(p.key, pts, pct);
+        $(`lab-${p.key}`).textContent = "Opening now · last estimate";
+        $(`open-${p.key}`).textContent = fmt(implied);
+        $(`plain-${p.key}`).textContent = n.mins < 573
+          ? "Opened at 9:30. The 9:31 level shows here in a moment; until then, this is the last estimate."
+          : n.mins < 615
+          ? `Yahoo's data for the ${m.name} runs about 15 minutes behind, so its 9:31 level will appear here around 9:45. Until then, this is the last estimate.`
+          : `Yahoo's data for the ${m.name} is late today, so its 9:31 level isn't available yet. This is the last estimate; the page checks again every minute.`;
+        continue;
+      }
       if (fRef == null && !(s && s.ok)) {
         $(`lab-${p.key}`).textContent = "Implied open";
         $(`open-${p.key}`).textContent = "—";
