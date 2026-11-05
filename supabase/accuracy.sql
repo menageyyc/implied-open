@@ -139,3 +139,21 @@ select cron.schedule('cron-run-log-cleanup', '17 8 * * *',
 -- The logger saves it from then on (never overwriting a saved value with null). Run this before
 -- creating summary() above if rebuilding from scratch.
 alter table implied_open.actuals add column if not exists price_931 numeric;
+
+-- TSX via SXF and saved commodity prices (added 2026-11, migration implied_open_sxf_prices).
+-- Snapshots and actuals for key 'tsxsxf' use the existing tables (no schema change). Vault secret
+-- implied_open_sxf_key = the same value as the Pages env var SXF_LOGGER_KEY on project implied-open
+-- (the logger sends it to https://implied-open.soesraider.com/api/sxf in the x-sxf-key header).
+-- Copy the TSX actuals already saved, so tsxsxf rows from the first live morning have something to join:
+--   insert into implied_open.actuals (trade_date, key, prev_close, open_official, price_931, price_935)
+--   select trade_date, 'tsxsxf', prev_close, open_official, price_931, price_935 from implied_open.actuals
+--   where key = 'tsx' on conflict do nothing;
+create table if not exists implied_open.prices (
+  slot timestamptz not null,          -- the logger's 5-minute tick
+  symbol text not null,               -- CL=F (WTI), GC=F (gold), CADUSD=X (loonie), HG=F (copper)
+  price numeric not null,             -- latest Yahoo 5-minute close at that tick
+  price_time timestamptz not null,    -- end of that 5-minute bar
+  primary key (slot, symbol)
+);
+alter table implied_open.prices enable row level security;
+revoke all on implied_open.prices from public, anon, authenticated;
