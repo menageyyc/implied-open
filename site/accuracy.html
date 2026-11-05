@@ -100,6 +100,13 @@ tr.hl td { font-weight: 500; }
   </section>
 
   <section class="panel">
+    <h2>Does fresher data help?</h2>
+    <p class="muted" id="fresh-sub"></p>
+    <div class="tablewrap"><table id="fresh"></table></div>
+    <p class="muted" id="fresh-note"></p>
+  </section>
+
+  <section class="panel">
     <h2>Average miss by time before the open</h2>
     <p class="muted">How far the estimate was from the actual open, on average, depending on how early it was taken. Lower is better. The orange line is the simplest possible guess, "it opens where it closed yesterday", for comparison.</p>
     <div class="legend"><span><i class="sw" style="border-color:var(--s1)"></i>Implied open estimate</span><span><i class="sw" style="border-color:var(--s2);border-top-style:dashed"></i>"No change" guess</span></div>
@@ -327,6 +334,38 @@ tr.hl td { font-weight: 500; }
     }
     $("glance").innerHTML = html + `</tbody>`;
   }
+  // Does a fresher price help? For each earlier futures time h, the average extra miss compared with the price at 9:30
+  // (which is what real-time data would show at the open), and t: that average divided by its day-to-day wobble
+  // (the standard error), a paired t-statistic. About 2 or more: unlikely to be luck. Under 1: could easily be luck.
+  function freshStats(rows, h) {
+    const n = rows.length; if (!n) return null;
+    const diff = rows.map((d) => (Math.abs(+d.est[h] - d.a) - Math.abs(+d.est[0] - d.a)) / d.a * 100);
+    const mu = diff.reduce((x, y) => x + y, 0) / n;
+    const mae = rows.reduce((t, d) => t + Math.abs(+d.est[h] - d.a) / d.a * 100, 0) / n;
+    const sd = n > 1 ? Math.sqrt(diff.reduce((t, x) => t + (x - mu) * (x - mu), 0) / (n - 1)) : 0;
+    return { n, mae, mu, t: sd > 0 ? mu / (sd / Math.sqrt(n)) : null, better: diff.filter((x) => x > 0).length };
+  }
+  function drawFresh() {
+    const all = days().filter((d) => (state.roll || !d.roll) && d.est && d.est[0] != null);
+    const move = (d) => Math.abs(d.a - d.prev_close) / d.prev_close;
+    const big = [...all].sort((x, y) => move(y) - move(x)).slice(0, Math.max(5, Math.floor(all.length / 3)));
+    $("fresh-sub").textContent = `${keyName()}, compared with ${cmpName().replace(/\.$/, "")}. The page's prices are about 10 minutes old, so the 9:20 price is what you see at 9:30. The 9:30 price, which you'd only see at 9:40, stands in for real-time data. "Extra miss" is how much further off each earlier price was than the 9:30 price. "Biggest-move days" are the third of days with the largest move from the previous close.`;
+    let html = `<thead><tr><th>Price from</th><th>Seen on the page at</th><th>Average miss</th><th>Extra miss vs 9:30 price</th><th>t (how sure)</th><th>9:30 price closer on</th></tr></thead><tbody>`;
+    const block = (label, rows, need) => {
+      html += `<tr><td colspan="6" class="muted"><strong>${label}</strong>${rows.length ? ` (${rows.length} day${rows.length === 1 ? "" : "s"})` : ""}</td></tr>`;
+      for (const h of [30, 20, 10]) {
+        const r = rows.filter((d) => d.est[h] != null), f = need && r.length < need ? null : freshStats(r, h);
+        html += `<tr${h === 10 ? ' class="hl"' : ""}><td>${clock(h)}</td><td>${clock(h - 10)}</td>` + (f
+          ? `<td>${fmt(f.mae, 2)}%</td><td>${pct(f.mu, 3)}</td><td>${f.t == null ? "–" : (f.t >= 0 ? "" : "−") + fmt(Math.abs(f.t), 1)}</td><td>${f.better} of ${f.n} day${f.n === 1 ? "" : "s"}</td>`
+          : `<td colspan="4" class="muted">not enough days yet</td>`) + `</tr>`;
+      }
+    };
+    block("All days", all, 3);
+    block("Biggest-move days", big, all.length >= 15 ? 5 : 1e9);
+    $("fresh").innerHTML = html + "</tbody>";
+    $("fresh-note").textContent = `How to read t: it is the average extra miss divided by how much that varies from day to day (a paired t-statistic). Around 2 or more means the difference is unlikely to be luck; under 1 means it could easily be luck; negative means the older price did better. With under 20 days, treat every t here as a first look.` +
+      (all.length && all.length < 20 ? ` Only ${all.length} day${all.length === 1 ? "" : "s"} counted for this index so far.` : "");
+  }
   function drawRecent() {
     const rows = days().slice(-15).reverse();
     const hs = [480, 240, 30, 20, 10];
@@ -343,7 +382,7 @@ tr.hl td { font-weight: 500; }
   function draw() {
     controls();
     if (!state.data) return;
-    drawGlance(); drawCurve(); drawDays(); drawRecent();
+    drawGlance(); drawFresh(); drawCurve(); drawDays(); drawRecent();
   }
 
   async function load() {
