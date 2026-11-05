@@ -349,7 +349,7 @@ tr.hl td { font-weight: 500; }
     const all = days().filter((d) => (state.roll || !d.roll) && d.est && d.est[0] != null);
     const move = (d) => Math.abs(d.a - d.prev_close) / d.prev_close;
     const big = [...all].sort((x, y) => move(y) - move(x)).slice(0, Math.max(5, Math.floor(all.length / 3)));
-    $("fresh-sub").textContent = `${keyName()}, compared with ${cmpName().replace(/\.$/, "")}. The page's prices are about 10 minutes old, so the 9:20 price is what you see at 9:30. The 9:30 price, which you'd only see at 9:40, stands in for real-time data. "Extra miss" is how much further off each earlier price was than the 9:30 price.`;
+    $("fresh-sub").textContent = `${keyName()}, compared with ${cmpName().replace(/\.$/, "")}. The page's prices are about 10 minutes old, so the 9:20 price is what you see at 9:30. The 9:30 price, which you'd only see at 9:40, stands in for real-time data. "Extra miss" is how much further off each earlier price was than the 9:30 price. "Biggest-move days" are the third of days with the largest move from the previous close.`;
     let html = `<thead><tr><th>Price from</th><th>Seen on the page at</th><th>Average miss</th><th>Extra miss vs 9:30 price</th><th>t (how sure)</th><th>9:30 price closer on</th></tr></thead><tbody>`;
     const block = (label, rows, need) => {
       html += `<tr><td colspan="6" class="muted"><strong>${label}</strong>${rows.length ? ` (${rows.length} day${rows.length === 1 ? "" : "s"})` : ""}</td></tr>`;
@@ -361,7 +361,7 @@ tr.hl td { font-weight: 500; }
       }
     };
     block("All days", all, 3);
-    block("Biggest-move days (the third of days the index moved most from the previous close)", big, all.length >= 15 ? 5 : 1e9);
+    block("Biggest-move days", big, all.length >= 15 ? 5 : 1e9);
     $("fresh").innerHTML = html + "</tbody>";
     $("fresh-note").textContent = `How to read t: it is the average extra miss divided by how much that varies from day to day (a paired t-statistic). Around 2 or more means the difference is unlikely to be luck; under 1 means it could easily be luck; negative means the older price did better. With under 20 days, treat every t here as a first look.` +
       (all.length && all.length < 20 ? ` Only ${all.length} day${all.length === 1 ? "" : "s"} counted for this index so far.` : "");
