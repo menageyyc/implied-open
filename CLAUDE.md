@@ -50,6 +50,15 @@ produce a OneDrive conflict copy.
 CLOUD CODING SESSIONS
 - The GitHub repo is the project's home; notes and handoffs live there, not in OneDrive.
 
+LOCAL AND CLOUD SESSIONS
+- I use both. Local sessions can see my laptop and everything in the cloud; cloud sessions can't see my laptop, and my laptop is often closed while I'm away.
+- Git and Drive hold the real version of everything. Neither kind of session keeps anything important only to itself.
+- When a local session ends, push. Work saved only on the laptop is invisible to cloud sessions.
+- When a local session starts, pull. The cloud may have changed things while the laptop was closed.
+- Never run a local and a cloud session on the same project at the same time. One at a time per project, or separate branches.
+- Memory and instructions go in the repo's CLAUDE.md, not only in the laptop's memory folder; it's the only place both can read.
+- Local sessions are for work that needs the laptop or a physical device (e.g. Garmin builds and watch testing). Run them on your own: code, build, test, commit, push. Ask me only for the physical step, such as plugging in the watch.
+
 GIT / GITHUB WORKFLOW (every coding session, every project)
 - main is the single source of truth. Start every session by reading the handoff/notes on main.
 - Before starting work, check for any claude/* branches with work not yet in main. If found, bring that work in first and tell me.
