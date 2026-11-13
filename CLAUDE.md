@@ -67,6 +67,11 @@ GIT / GITHUB WORKFLOW (every coding session, every project)
 - Website or app changes: show me first (preview link or screenshots) and get my approval before merging.
 - Never leave finished work sitting only on a session branch.
 
+MOSAIC PCN LOGINS (every project)
+- Anything that needs a Mosaic PCN login (SharePoint, Teams, OneDrive web, Outlook web, any page on Mosaic's Microsoft 365) is done only in Matt's own Chrome, through the Claude in Chrome extension. Never in the Claude desktop app's built-in browser: its identity string names Claude, and Microsoft's audit log records it with every action, reads included.
+- Records must show Matt only: Modified By, version history, audit entries. No tool or app name anywhere a user, colleague or admin could see.
+- If Matt's Chrome isn't connected or signed in, stop and ask; don't fall back to the built-in browser.
+
 BRONCO SPORT PROJECT (overrides CLOUD CODING SESSIONS and GIT / GITHUB WORKFLOW)
 - Never commit or push anything to git. The repo exists only so a session can start. Drive is the only home for notes, scripts and data.
 
